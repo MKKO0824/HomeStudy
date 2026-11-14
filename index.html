@@ -236,6 +236,12 @@ code.ntfyt{background:#EEF4FF;padding:3px 8px;border-radius:8px;font-size:16px;u
 @keyframes stick{0%{transform:translate(-50%,-50%) rotate(var(--r)) scale(1.6);opacity:.4}100%{transform:translate(-50%,-50%) rotate(var(--r)) scale(1)}}
 .bookbtns{margin-top:14px}
 @media (prefers-reduced-motion:reduce){.stray .st{animation:none}}
+.claim{display:table;margin-top:12px;background:#FFF6DA;border-radius:14px;padding:8px 16px;font-size:20px}
+.claim.bad{background:#FFECEA}.claim s{text-decoration-thickness:3px;text-decoration-color:var(--coral)}
+.claimq{margin-top:10px;font-weight:700;font-size:19px}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}.vs>div{background:#F4F7FC;border-radius:16px;padding:14px;text-align:center}
+.choices .mid{font-size:22px}
+.vs .mid{font-size:22px;white-space:nowrap}.choices .mid{font-size:19px;white-space:nowrap}
 </style></head><body><div id="app"></div><div id="modal" class="modal hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.STANDALONE=true;
@@ -986,12 +992,7 @@ function buildMath(L,{week,day,kind,month}){const tr=L.track;const {u,ui,wi,us}=
  const weak=weakSkills(L).filter(s=>s.startsWith('m'));const prev=ui>0?uniq(us.slice(Math.max(0,ui-3),ui).flatMap(x=>x.calc)):(u?u.calc:allC);
  const warm=gen(shuffle(weak.length?weak.slice(0,3).concat(prev):prev),weak.length?2:(ui>0?2:1),6);
  const title=uLabel(u);
- if(kind==='study')return {title,blocks:[
-  {type:'quiz',title:'워밍업',mins:5,mode:'practice',items:warm,note:weak.length?'지난 기록에서 약했던 부분을 먼저 복습해요.':'앞 단원 복습으로 머리를 깨워요.'},
-  {type:'concept',title:'개념 익히기',mins:10,cards:u?u.c:[['총복습','지금까지 배운 내용을 섞어서 풀어요. 틀린 문제는 연습장에 다시 풀어 보세요.','']]},
-  {type:'quiz',title:'연습 문제',mins:20,mode:'practice',items:gen(shuffle(calc),lv,15)},
-  {type:'quiz',title:'응용 문제',mins:15,mode:'practice',items:gen(shuffle(word),lv,5)},
-  {type:'summary',title:'정리'}]};
+ if(kind==='study')return {title,blocks:mathDay(day,{warm,warmNote:weak.length?'지난 기록에서 약했던 부분을 먼저 복습해요.':'앞 단원 복습으로 머리를 깨워요.',u,calc,word,lv})};
  if(kind==='week'){const wk=uniq([week-1,week].map(w=>unitAt(tr,Math.max(1,w)).ui)).map(i=>i<0?null:us[i]);const wc=uniq(wk.flatMap(x=>x?x.calc:allC)),ww=uniq(wk.flatMap(x=>x?x.word:allW));
   return {title:`${week}주차 주간 평가 · ${title}`,blocks:[
   {type:'quiz',title:'몸풀기',mins:5,mode:'practice',items:warm.slice(0,4)},
@@ -1005,13 +1006,7 @@ function buildMath(L,{week,day,kind,month}){const tr=L.track;const {u,ui,wi,us}=
 function buildKor(L,{week,day,kind,month}){const {u}=unitAt('kor2',week);const U=u||KPREP[(week-1)%KPREP.length];
  const weak=weakSkills(L).filter(s=>s.startsWith('g_')&&s!=='g_dict');const rev=uniq(['g_spell','g_conf','g_space'].concat(weak.slice(0,2)));
  const dict=n=>shuffle(KDICT).slice(0,n).map(s=>({skill:'g_dict',kind:'dict',q:'잘 듣고 받아써요',say:s,a:s,tag:s}));
- if(kind==='study')return {title:uLabel(U),blocks:[
-  {type:'quiz',title:'받아쓰기',mins:10,mode:'practice',items:dict(5),note:'문장을 듣고 아래 칸(또는 공책)에 또박또박 써요.'},
-  {type:'concept',title:'오늘의 공부',mins:5,cards:U.c},
-  {type:'quiz',title:'단원 문제',mins:15,mode:'practice',items:gen(shuffle(U.skills),2,10)},
-  {type:'quiz',title:'글 읽기',mins:12,mode:'practice',items:passageItems(U.read,3)},
-  {type:'quiz',title:'맞춤법 복습',mins:5,mode:'practice',items:gen(shuffle(rev),2,5)},
-  {type:'summary',title:'정리'}]};
+ if(kind==='study')return {title:uLabel(U),blocks:korDay(day,{U,dict,rev})};
  const big=kind==='month';const ws=big?[week-3,week-2,week-1,week]:[week-1,week];const wk=uniq(ws.map(w=>unitAt('kor2',Math.max(1,w)).u).filter(Boolean));const sk=uniq((wk.length?wk:[U]).flatMap(x=>x.skills));
  return {title:big?`${month}월차 월간 평가 (국어)`:`${week}주차 주간 평가 · ${uLabel(U)}`,blocks:[
   {type:'quiz',title:'받아쓰기 평가',mins:10,mode:'test',items:dict(big?10:8)},
@@ -1626,6 +1621,47 @@ async function skipUnit(id){const L=Store.S.learners[id];const d=nextUnitDone(L)
  const label=L.track==='hangul'?`${np.week}주차 · ${hWeek(np.week).t}`:uLabel(unitAt(L.track,np.week).u);
  const c=await modal(`<h2>다음 단원으로 넘어갈까요?</h2><p><b>${esc(label)}</b>부터 시작해요. 지금 단원의 남은 회차는 건너뛰어요. 필요하면 나중에 '단원 고르기'에서 다시 풀 수 있어요.</p>`,[{t:'취소',v:0,cls:'ghost'},{t:'넘어가기',v:1}]);
  if(!c.v)return;Store.put('learners',L.id,Object.assign({},L,{done:d,updatedAt:Date.now()}));toast('다음 단원으로 넘어갔어요');App.go('home');}
+
+// ================= 회차마다 다른 형식 (1회 기본 → 2회 친구 답 검사 → 3회 거꾸로·비교 → 4회 번개·고쳐 주기) =================
+const FRIENDS=['민지','도윤','서아','하준','지우','예준','소율','시우'];
+const isNumA=it=>it&&it.kind==='num'&&/^\d+(\.\d+)?$/.test(it.a);
+const plainQ=q=>!/<svg|<table|<img/.test(q)&&q.replace(/<[^>]+>/g,'').length<60;
+function nearWrong(a){const n=+a,dec=String(a).includes('.');let w=n;for(let k=0;k<30&&(w===n||w<0);k++){const d=dec?pick([-0.2,-0.1,0.1,0.2]):pick([-10,-2,-1,1,2,10,n>=100?100:5,n>=100?-100:-5]);w=dec?+(n+d).toFixed(1):n+d;}return String(w===n?n+1:w);}
+function choiceH(it,v){const c=(it.choices||[]).find(c=>c.v===v);return c?c.h:esc(v);}
+function wrongOf(it){if(isNumA(it))return nearWrong(it.a);if(it.kind==='choice'){const o=(it.choices||[]).filter(c=>c.v!==it.a);return o.length?pick(o).v:null;}return null;}
+function asOX(it){if(!it||it.kind==='multi'||it.kind==='dict')return it;const wrong=Math.random()<0.5;const cl=wrong?wrongOf(it):it.a;if(cl===null)return it;const f=pick(FRIENDS);
+ return Object.assign({},it,{kind:'choice',q:`${it.q}<div class="claim">🙋 ${f}의 답: <b>${it.kind==='choice'?choiceH(it,cl):esc(cl)}</b></div><div class="claimq">${f}의 답이 맞을까요?</div>`,a:wrong?'틀려요':'맞아요',choices:[{v:'맞아요',h:'⭕ 맞아요'},{v:'틀려요',h:'❌ 틀려요'}],hint:it.hint||'먼저 연습장에 직접 풀어 보고, 친구 답과 비교해요.'});}
+function asFix(it){if(!it||it.kind==='multi'||it.kind==='dict')return it;const cl=wrongOf(it);if(cl===null)return it;const f=pick(FRIENDS);
+ const head=`${it.q}<div class="claim bad">🙋 ${f}의 답: <s>${it.kind==='choice'?choiceH(it,cl):esc(cl)}</s> ❌ 틀렸대요!</div><div class="claimq">바른 답을 알려 줘요</div>`;
+ if(it.kind==='choice')return Object.assign({},it,{q:head,choices:it.choices.filter(c=>c.v!==cl)});return Object.assign({},it,{q:head});}
+function asChoice(it){if(!isNumA(it))return it;const set=new Set([it.a]);for(let k=0;k<40&&set.size<4;k++)set.add(nearWrong(it.a));return Object.assign({},it,{kind:'choice',choices:shuffle([...set].map(v=>({v,h:esc(v)})))});}
+function revItems(keys,lv,n){const out=[];for(let i=0;i<n*4&&out.length<n;i++){const k=keys[i%keys.length];const t=G[k](lv);if(!isNumA(t)||!plainQ(t.q)||!/=/.test(t.q))continue;
+  const others=[];for(let j=0;j<30&&others.length<2;j++){const o=G[k](lv);if(isNumA(o)&&plainQ(o.q)&&o.a!==t.a&&!others.some(x=>x.a===o.a))others.push(o);}if(others.length<2)continue;
+  const opts=shuffle([t,...others]).map((x,ix)=>({v:'abc'[ix],h:x.q.replace(/class="big"/g,'class="mid"'),_t:x===t}));
+  out.push({skill:t.skill,kind:'choice',q:`<div class="mid">답이 <span class="box">${esc(t.a)}</span>인 식은 어느 것일까요?</div>`,a:opts.find(o=>o._t).v,choices:opts.map(({v,h})=>({v,h})),hint:'세 식을 하나씩 계산해 봐요.'});}
+ return out.length>=Math.min(3,n)?out:null;}
+function cmpItems(keys,lv,n){const out=[];for(let i=0;i<n*4&&out.length<n;i++){const k=keys[i%keys.length];const x=G[k](lv),y=G[k](lv);if(!isNumA(x)||!isNumA(y)||!plainQ(x.q)||!plainQ(y.q))continue;
+  const a=+x.a>+y.a?'가':+x.a<+y.a?'나':'같아요';const sm=q=>q.replace(/class="big"/g,'class="mid"');
+  out.push({skill:x.skill,kind:'choice',q:`<div class="vs"><div><b>가</b> ${sm(x.q)}</div><div><b>나</b> ${sm(y.q)}</div></div><div class="claimq">답이 더 큰 쪽은?</div>`,a,choices:[{v:'가',h:'가'},{v:'나',h:'나'},{v:'같아요',h:'같아요'}],hint:'두 문제를 모두 풀고 답을 비교해요.'});}
+ return out.length>=Math.min(3,n)?out:null;}
+function mathDay(day,{warm,warmNote,u,calc,word,lv}){const sc=shuffle(calc.slice()),sw=shuffle(word.slice());
+ const cards=u?u.c:[['총복습','지금까지 배운 내용을 섞어서 풀어요. 틀린 문제는 연습장에 다시 풀어 보세요.','']];
+ const W={type:'quiz',title:'워밍업',mins:5,mode:'practice',items:warm,note:warmNote};const E={type:'summary',title:'정리'};const Q=(title,mins,items,note)=>({type:'quiz',title,mins,mode:'practice',items,note});
+ const f=((day-1)%4)+1;
+ if(f===2)return [W,{type:'concept',title:'개념 다시 보기',mins:5,cards},
+  Q('🙋 친구 답 검사하기',15,gen(sc,lv,10).map(asOX),'친구가 푼 답이 맞는지 ⭕❌로 골라요. 꼭 직접 풀어 보고 골라요!'),
+  Q('연습 문제',10,gen(sc,lv,6)),Q('응용 문제 · 골라 보기',10,gen(sw,lv,5).map(asChoice),'답을 먼저 구하고 보기에서 찾아요.'),E];
+ if(f===3){const rv=revItems(sc,lv,5),cp=cmpItems(sc,lv,5);return [W,rv?Q('🔎 거꾸로 찾기',10,rv,'답을 먼저 보고, 그 답이 나오는 식을 찾아요.'):Q('🛠️ 틀린 답 고쳐 주기',10,gen(sc,lv,5).map(asFix),'친구가 틀렸어요. 바른 답을 알려 줘요.'),
+  cp?Q('⚖️ 어느 쪽이 더 클까?',10,cp,'두 문제를 모두 풀고 답을 비교해요.'):Q('🎯 보기 없이 풀기',10,gen(sc,lv,5),'이번엔 스스로 끝까지 풀어요.'),Q('연습 문제',10,gen(sc,lv,6)),Q('응용 문제',10,gen(sw,lv,4)),E];}
+ if(f===4)return [Q('⚡ 번개 퀴즈',8,gen(sc,Math.max(1,lv-1),12),'쉬운 문제를 빠르게! 그래도 정확하게.'),{type:'concept',title:'개념 다시 보기',mins:5,cards},
+  Q('🛠️ 틀린 답 고쳐 주기',12,gen(sc,lv,6).map(asFix),'친구가 틀린 문제예요. 직접 풀어서 바른 답을 알려 줘요.'),Q('🏔️ 도전 응용 문제',15,gen(sw,Math.min(3,lv+1),5),'조금 어려운 문제예요. 연습장에 그림이나 식을 그려 봐요.'),E];
+ return [W,{type:'concept',title:'개념 익히기',mins:10,cards},Q('연습 문제',20,gen(sc,lv,15)),Q('응용 문제',15,gen(sw,lv,5)),E];}
+function korDay(day,{U,dict,rev}){const E={type:'summary',title:'정리'};const Q=(title,mins,items,note)=>({type:'quiz',title,mins,mode:'practice',items,note});const sk=shuffle(U.skills.slice());
+ const D=n=>Q('받아쓰기',10,dict(n),'문장을 듣고 아래 칸(또는 공책)에 또박또박 써요.');const f=((day-1)%4)+1;
+ if(f===2)return [D(5),{type:'concept',title:'오늘의 공부',mins:5,cards:U.c},Q('🙋 친구 답 검사하기',12,gen(sk,2,10).map((it,i)=>i%2?asOX(it):it),'친구가 고른 답이 맞는지 ⭕❌로 골라요.'),Q('글 읽기',12,passageItems(U.read,3)),Q('맞춤법 복습',5,gen(shuffle(rev),2,5)),E];
+ if(f===3)return [D(4),Q('📚 읽기 집중',18,passageItems(U.read,4),'오늘은 글을 많이 읽어요. 천천히 끝까지 읽고 답해요.'),Q('단원 문제',10,gen(sk,2,6)),Q('🛠️ 틀린 답 고쳐 주기',6,gen(shuffle(rev),2,5).map(asFix),'친구가 틀렸어요. 바른 답을 골라 줘요.'),E];
+ if(f===4)return [Q('⚡ 번개 맞춤법',6,gen(shuffle(rev),2,10),'빠르게, 그래도 정확하게!'),D(4),{type:'concept',title:'오늘의 공부',mins:5,cards:U.c},Q('🏔️ 도전 문제',15,gen(sk,3,10),'조금 어려운 문제예요.'),Q('글 읽기',10,passageItems(U.read,2)),E];
+ return [D(5),{type:'concept',title:'오늘의 공부',mins:5,cards:U.c},Q('단원 문제',15,gen(sk,2,10)),Q('글 읽기',12,passageItems(U.read,3)),Q('맞춤법 복습',5,gen(shuffle(rev),2,5)),E];}
 
 // ================= 시작 =================
 // ================= 이메일 로그인 + Supabase 저장 (독립 버전 전용) =================
