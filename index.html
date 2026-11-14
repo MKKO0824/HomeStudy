@@ -215,6 +215,9 @@ input[type=email]{font-family:inherit;font-size:18px;padding:12px 14px;border-ra
 .wb svg{width:34px;height:34px;vertical-align:middle;margin-right:4px}
 .sumb{display:flex;flex-direction:column;align-items:center;gap:4px}.sumb svg{width:90px;height:90px}.sumb span{font-size:13px;color:var(--mute);font-weight:700}
 button.chip{cursor:pointer;font-weight:700}
+input.afield{text-align:center;color:var(--ink);outline:none;width:150px;caret-color:var(--c)}
+.penhint{margin-top:6px;color:var(--mute)}
+code.ntfyt{background:#EEF4FF;padding:3px 8px;border-radius:8px;font-size:16px;user-select:all}
 </style></head><body><div id="app"></div><div id="modal" class="modal hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.STANDALONE=true;
@@ -1139,14 +1142,17 @@ function blockQuiz(el,b){const S=App.sess;const isKid=S.L.track==='hangul';const
   if(it.kind==='choice')body+=`<div class="choices">${it.choices.map((c,k)=>`<button data-k="${k}">${c.h}</button>`).join('')}</div>`;
   else if(it.kind==='dict')body+=`<div class="pad"><div class="padbar"><b>✏️ 여기에 써요</b><span class="small">공책에 써도 좋아요</span><div class="sp"></div><button class="btn ghost sm" id="dclr">지우기</button></div><canvas id="dc" style="height:230px"></canvas></div><div class="row" style="justify-content:center" id="dact"><button class="btn gr" id="dok">다 썼어요 → 정답 보기</button></div>`;
   else if(it.kind==='build')body+=`<div class="build"><div class="bprev" id="bp"></div><div class="tiles"><div class="lab">첫소리 (자음)</div>${it.cons.map(c=>`<button data-bc="${c}">${c}</button>`).join('')}</div><div class="tiles"><div class="lab">가운데 소리 (모음)</div>${it.vows.map(c=>`<button data-bv="${c}">${c}</button>`).join('')}</div>${it.jongs?`<div class="tiles"><div class="lab">받침</div>${it.jongs.map(c=>`<button class="${c==='없음'?'t2 on':''}" data-bj="${c}">${c}</button>`).join('')}</div>`:''}<button class="btn gr" id="bok">다 만들었어요!</button></div>`;
-  else body+=`<div class="answer">${val.map((_,k)=>`<div class="afield ${k===0?'on':''}" data-f="${k}"></div>${it.kind==='multi'?`<span class="alabel">${it.labels[k]}</span>`:''}`).join('')}</div><div class="keypad">${['7','8','9','⌫','4','5','6',it.kind==='multi'?'→':'','1','2','3','.','0','00','','✔'].map(k=>k===''?'<span></span>':`<button data-key="${k}" class="${k==='✔'?'ok':''}" ${k==='.'&&!it.dec?'style="visibility:hidden"':''}>${k==='✔'?'확인':k}</button>`).join('')}</div>`;
+  else body+=`<div class="answer">${val.map((_,k)=>`<input class="afield ${k===0?'on':''}" data-f="${k}" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="답">${it.kind==='multi'?`<span class="alabel">${it.labels[k]}</span>`:''}`).join('')}</div><div class="keypad">${['7','8','9','⌫','4','5','6',it.kind==='multi'?'→':'','1','2','3','.','0','00','','✔'].map(k=>k===''?'<span></span>':`<button data-key="${k}" class="${k==='✔'?'ok':''}" ${k==='.'&&!it.dec?'style="visibility:hidden"':''}>${k==='✔'?'확인':k}</button>`).join('')}</div>`;
   const tools=`<div class="qtools">${!test&&it.hint?'<button class="btn ghost sm" id="hint">💡 힌트</button>':''}${it.col&&!test?'<button class="btn ghost sm" id="colb">✏️ 세로셈 틀 보기</button>':''}</div><div id="hb"></div>`;
   qc.innerHTML=head+body+tools;if(pad)pad.clear();
   const speakIt=()=>Voice.say(it.say||'');if(it.say)setTimeout(speakIt,250);const sb=$('#say');if(sb)sb.onclick=speakIt;
   const hb=$('#hint');if(hb)hb.onclick=()=>{it._hint=true;$('#hb').innerHTML=`<div class="hintbox">💡 ${it.hint}</div>`;};
   const cb=$('#colb');if(cb)cb.onclick=()=>{$('#hb').innerHTML=`<div class="hintbox center">${vert(it.col[0],it.col[1],it.col[2])}<div class="small">연습장에 이렇게 자리를 맞춰 써서 풀어 보세요.</div></div>`;};
-  const fields=()=>qc.querySelectorAll('.afield').forEach((f,k)=>{f.textContent=val[k];f.classList.toggle('on',k===fi);});
-  qc.querySelectorAll('.afield').forEach(f=>f.onclick=()=>{fi=+f.dataset.f;fields();});
+  const fields=()=>qc.querySelectorAll('.afield').forEach((f,k)=>{if(f.value!==val[k])f.value=val[k];f.classList.toggle('on',k===fi);});
+  qc.querySelectorAll('.afield').forEach(f=>{f.onfocus=f.onclick=()=>{fi=+f.dataset.f;fields();};
+   f.oninput=()=>{let v=f.value.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[oO]/g,'0').replace(/[lI|]/g,'1').replace(/[^0-9.]/g,'');if(!it.dec)v=v.replace(/\./g,'');val[+f.dataset.f]=v.slice(0,7);fi=+f.dataset.f;fields();};
+   f.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const ok=qc.querySelector('[data-key="✔"]');if(ok)ok.click();}};});
+  if(qc.querySelector('.afield'))qc.querySelector('.answer').insertAdjacentHTML('afterend','<div class="small center penhint">✏️ 애플 펜슬로 칸에 숫자를 직접 써도 돼요</div>');
   qc.querySelectorAll('[data-key]').forEach(k=>k.onclick=()=>{const key=k.dataset.key;
    if(key==='⌫')val[fi]=val[fi].slice(0,-1);else if(key==='→')fi=(fi+1)%val.length;else if(key==='✔'){if(val.some(v=>v===''))return toast('답을 모두 써 주세요');submit(it.kind==='multi'?val.slice():val[0]);return;}
    else if(val[fi].length<7){if(key==='.'&&val[fi].includes('.'))return;val[fi]+=key;}fields();});
@@ -1187,13 +1193,13 @@ function collect(S){const skills={},wrong=[];let pc=0,pt=0,tc=0,tt=0;const st={n
   if(r&&r.ms!=null){st.n++;st.ms+=Math.min(r.ms,180000);if(r.hint)st.hints++;if(!ok&&r.fms<3000&&it.kind!=='dict')st.quickWrong++;if(r.tries>1&&r.ok===false&&b.mode!=='test'&&r.given!==undefined&&check2(it,r.given))st.retryWin++;else if(r.tries>1&&!check2(it,r.given))st.finalWrong++;}});});
  return {skills,wrong:wrong.slice(0,40),practice:{c:pc,t:pt},test:tt?{c:tc,t:tt,score:Math.round(tc/tt*100)}:null,stats:{n:st.n,avgSec:st.n?Math.round(st.ms/st.n/1000*10)/10:0,hints:st.hints,quickWrong:st.quickWrong,retryWin:st.retryWin,finalWrong:st.finalWrong,idle:S.idle||0}};}
 function check2(it,v){if(v===undefined)return false;if(Array.isArray(it.a))return Array.isArray(v)&&it.a.every((x,k)=>Number(x)===Number(v[k]));if(it.kind==='num')return Number(v)===Number(it.a);return String(v)===String(it.a);}
-function saveQuit(S){const data=collect(S);if(!data.stats.n)return;const L=Store.S.learners[S.L.id];if(!L)return;const p=S.plan;const rec=Object.assign({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),learnerId:L.id,track:L.track,week:p.week,day:p.day,month:p.month,kind:'quit',date:today(),ts:Date.now(),sec:Math.round((Date.now()-S.start)/1000),mode:S.mode,topic:S.title,progress:`${S.bi}/${S.blocks.length}`},data);Store.put('records',rec.id,rec);}
+function saveQuit(S){const data=collect(S);if(!data.stats.n)return;const L=Store.S.learners[S.L.id];if(!L)return;const p=S.plan;const rec=Object.assign({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),learnerId:L.id,track:L.track,week:p.week,day:p.day,month:p.month,kind:'quit',date:today(),ts:Date.now(),sec:Math.round((Date.now()-S.start)/1000),mode:S.mode,topic:S.title,progress:`${S.bi}/${S.blocks.length}`},data);Store.put('records',rec.id,rec);try{notifyQuit(S,rec);}catch(e){}}
 function saveRecord(S,data){const L=Store.S.learners[S.L.id];if(!L)return null;const p=S.plan;
  const rec=Object.assign({month:p.month,id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),learnerId:L.id,track:L.track,no:L.done+1,week:p.week,day:p.day,kind:p.kind,date:today(),ts:Date.now(),sec:Math.round((Date.now()-S.start)/1000),mode:S.mode,trace:S.trace||0,topic:topicOf(L,p.week)},data);
  if(S.free){rec.kind='practice';rec.topic=S.title.replace('🔁 다시 풀기 · ','');}
  Store.put('records',rec.id,rec);const nd=S.free?L.done:L.done+1;const np=plan({done:nd,startWeek:L.startWeek});let cur=null;try{if(L.track==='kor2'){const {u}=unitAt('kor2',np.week);cur={week:np.week,unit:uLabel(u),read:u?u.read:'story',grade:u?u.sem:'3학년'};}else cur={week:np.week,unit:topicOf(L,np.week)};}catch(e){}
  const L2=Object.assign({},L,{done:nd,cur,updatedAt:Date.now()});Store.put('learners',L.id,L2);return rec;}
-function blockSummary(el){const S=App.sess;clearInterval(timerInt);const data=collect(S);data.gold=!!data.test;data.sticker=pickSticker(S.L,data.gold);const rec=saveRecord(S,data);
+function blockSummary(el){const S=App.sess;clearInterval(timerInt);const data=collect(S);data.gold=!!data.test;data.sticker=pickSticker(S.L,data.gold);const rec=saveRecord(S,data);try{notifyDone(S,data,rec);}catch(e){}
  const acc=data.test?data.test.score:(data.practice.t?Math.round(data.practice.c/data.practice.t*100):100);const stars=acc>=90?3:acc>=70?2:1;
  const isTest=!!data.test;const min=Math.max(1,Math.round(rec.sec/60));
  Snd.fx('win');const lv=buddyLevel(S.L);
@@ -1232,18 +1238,18 @@ function sheetHTML(S,full){const L=S.L,p=S.plan;const items=paperItems(S);const 
  .scratch{border:1px solid #ccc;height:260px;margin-top:10px;background-image:linear-gradient(#eee 1px,transparent 1px),linear-gradient(90deg,#eee 1px,transparent 1px);background-size:24px 24px}
  .noprint{margin:10px 0}@media print{.noprint{display:none}body{padding:0}}@page{size:A4;margin:14mm}`;
  const body=`<div class="ph"><div><h1>${esc(L.name)}의 학습지</h1><small>${esc(S.title)}</small></div><small>${p.week}주차 ${p.day}회 · 날짜: ________ · 걸린 시간: ____분</small></div>
- ${learnH}${conceptH}${groups}${traceH}${L.track!=='hangul'?'<h3 class="pb">연습 칸</h3><div class="scratch"></div>':''}${key}`;
+ ${learnH}${conceptH}${groups}${traceH}${L.track!=='hangul'?'<h3 class="pb">연습 칸</h3><div class="scratch"></div>':''}${full?key:''}`;
  if(!full)return `<style>.sheet ${css.replace(/body\{[^}]*\}/,'').replace(/\}(?=[^}]*\{)/g,'} .sheet ').replace(/@media print\{[^}]*\}[^}]*\}/,'').replace(/@page\{[^}]*\}/,'')}</style>${body}`;
  return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(L.name)} 학습지 ${p.week}주차 ${p.day}회</title><link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet"><style>${css}</style></head><body><div class="noprint"><button onclick="window.print()" style="font-size:18px;padding:10px 18px">🖨️ 인쇄하기</button> <span>인쇄 후 아이가 연필로 풀고, 앱의 "채점하기"에서 ⭕/❌를 눌러 기록해요.</span></div>${body}</body></html>`;}
 function paperView(S){const app=$('#app');const items=paperItems(S);
  app.innerHTML=`<div class="wrap"><div class="sbar"><button class="btn ghost sm" id="back">← 돌아가기</button><h2 style="margin:0">📝 종이 학습지 · ${esc(S.L.name)}</h2></div>
  <div class="card"><p style="margin-top:0">${esc(S.title)} — 아이가 <b>연필로 직접</b> 풀고, 다 풀면 보호자가 <b>채점하기</b>에서 ⭕/❌를 눌러 주세요. 결과는 태블릿으로 푼 것과 똑같이 기록·평가에 반영돼요.</p>
- <div class="row"><button class="btn bl" id="dl">⬇️ 인쇄용 파일 받기</button><button class="btn ghost" id="cp">학습지 내용 복사</button><div class="sp"></div><button class="btn gr" id="grade">✔ 채점하기</button></div><p class="note" id="dln">받은 파일을 열어 🖨️ 인쇄하기를 누르면 A4로 인쇄돼요. 마지막 장은 보호자용 정답이에요.</p>
+ <div class="row"><button class="btn bl" id="dl">⬇️ 인쇄용 파일 받기</button><button class="btn ghost" id="cp">학습지 내용 복사</button><div class="sp"></div><button class="btn gr" id="grade">✔ 채점하기</button></div><p class="note" id="dln">받은 파일을 열어 🖨️ 인쇄하기를 누르면 A4로 인쇄돼요. 마지막 장은 보호자용 정답이에요. 정답이 들어 있어서 파일 받기와 채점은 보호자 확인 후에 열려요.</p>
  <div class="sheet" style="margin-top:12px">${sheetHTML(S,false)}</div></div></div>`;
  $('#back').onclick=()=>{App.sess=null;App.go('home');};
- $('#dl').onclick=async()=>{const html=sheetHTML(S,true);const fn=`학습지_${S.L.name}_${S.plan.week}주${S.plan.day}회.html`;if(await saveFile(fn,html)){toast('파일을 저장했어요');}else{$('#dln').innerHTML='이 화면에서는 파일 저장이 안 돼요. 화면의 학습지를 보며 공책에 풀거나, “학습지 내용 복사”로 문서에 붙여 넣어 인쇄해 주세요.';}};
+ $('#dl').onclick=()=>gate(async()=>{const html=sheetHTML(S,true);const fn=`학습지_${S.L.name}_${S.plan.week}주${S.plan.day}회.html`;if(await saveFile(fn,html)){toast('파일을 저장했어요');}else{$('#dln').innerHTML='이 화면에서는 파일 저장이 안 돼요. 화면의 학습지를 보며 공책에 풀거나, “학습지 내용 복사”로 문서에 붙여 넣어 인쇄해 주세요.';}});
  $('#cp').onclick=()=>{const t=document.querySelector('.sheet').innerText;navigator.clipboard.writeText(t).then(()=>toast('복사했어요')).catch(()=>toast('복사가 안 되는 환경이에요'));};
- $('#grade').onclick=()=>gradeView(S);}
+ $('#grade').onclick=()=>gate(()=>gradeView(S));}
 function gradeView(S){const app=$('#app');const items=paperItems(S);const marks=items.map(()=>null);const traces=S.blocks.filter(b=>b.type==='trace').flatMap(b=>b.letters).length;
  app.innerHTML=`<div class="wrap"><div class="sbar"><button class="btn ghost sm" id="back">← 학습지</button><h2 style="margin:0">✔ 채점하기 · ${esc(S.L.name)}</h2></div><div class="card">
  <div class="row"><span class="muted">아이의 답과 정답을 비교해 ⭕ 또는 ❌를 눌러 주세요. ${S.L.track==='hangul'?'읽기 문제는 아이가 바르게 읽었는지로 판단해요.':''}</span><div class="sp"></div><button class="btn ghost sm" id="allo">모두 ⭕</button></div>
@@ -1308,7 +1314,7 @@ function viewPlan(el){const tab=App.curTab;const tabs=[['m2','초2 수학 → 3�
  <div class="tabs2">${tabs.map(([k,t])=>`<button data-t="${k}" class="${tab===k?'on':''}">${t}</button>`).join('')}</div><div class="card" style="overflow:auto"><table class="rt cur">${head}${rows}</table></div>`;
  el.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{App.curTab=b.dataset.t;App.render();});}
 
-function viewHelp(el){el.innerHTML=`<div class="grid"><div class="card"><h2 style="margin-top:0">💾 기록 백업</h2><p style="margin-top:0">${Store.mode==='cloud'?'지금은 Claude 계정 클라우드에 저장되고 있어요. 그래도 가끔 백업 파일을 받아 두면 안심이에요.':'지금은 <b>이 기기(브라우저)에만</b> 저장되고 있어요. 브라우저 기록을 지우거나 기기를 바꾸면 사라질 수 있으니 <b>일주일에 한 번</b> 백업 파일을 받아 두세요. 다른 기기에서 "불러오기"를 하면 그대로 이어서 할 수 있어요.'}</p>
+function viewHelp(el){el.innerHTML=`<div class="grid">${notifyCard()}<div class="card"><h2 style="margin-top:0">💾 기록 백업</h2><p style="margin-top:0">${Store.mode==='cloud'?'지금은 Claude 계정 클라우드에 저장되고 있어요. 그래도 가끔 백업 파일을 받아 두면 안심이에요.':'지금은 <b>이 기기(브라우저)에만</b> 저장되고 있어요. 브라우저 기록을 지우거나 기기를 바꾸면 사라질 수 있으니 <b>일주일에 한 번</b> 백업 파일을 받아 두세요. 다른 기기에서 "불러오기"를 하면 그대로 이어서 할 수 있어요.'}</p>
  <div class="row"><button class="btn bl sm" id="bk">⬇️ 백업 파일 받기</button><label class="btn ghost sm" style="cursor:pointer">⬆️ 백업 불러오기<input type="file" id="rs" accept=".json,application/json" style="display:none"></label></div><p class="note" id="bkn"></p></div><div class="card"><h2 style="margin-top:0">💡 이렇게 쓰세요</h2><ol style="line-height:1.9;margin:0;padding-left:22px">
  <li><b>학습자 추가</b> → 아이 이름과 과정(초2 수학 / 초2 국어 / 초3 수학 / 한글 6~7세)을 고르세요. 초2 수학·국어는 <b>⭐ 지금 학교 진도</b> 단원이 추천돼요. 그 단원부터 교과서 순서대로 이어지고, 2학기가 끝나면 3학년 과정으로 넘어가 자연스럽게 선행이 돼요.</li><li>한 아이가 수학과 국어를 둘 다 하려면 <b>과정마다 따로 등록</b>하세요 (예: "서준 수학", "서준 국어").</li>
  <li><b>주 5회, 하루 1회</b>(최대 1시간) 진행해요. 빠진 날이 있어도 날짜가 아니라 <b>회차</b>로 이어지니 다음 날 이어서 하면 돼요.</li>
@@ -1474,6 +1480,36 @@ function viewReview(el){const pend=Store.content.filter(c=>c.status==='pending')
  <p class="small">지금까지 승인한 지문: ${Store.content.filter(c=>c.status==='approved').length}편</p>`;
  const act=async(id,st)=>{const c=Store.content.find(x=>String(x.id)===String(id));if(!c)return;try{const {error}=await Cloud.sb.from('hs_content').update({status:st}).eq('id',c.id);if(error)throw error;c.status=st;if(st==='approved')injectContent([c]);toast(st==='approved'?'아이 문제에 넣었어요':'뺐어요');viewReview(el);}catch(e){toast('저장하지 못했어요. 인터넷 연결을 확인해 주세요.');}};
  el.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>act(b.dataset.ok,'approved'));el.querySelectorAll('[data-no]').forEach(b=>b.onclick=()=>act(b.dataset.no,'rejected'));}
+
+// ================= 보호자 휴대폰 알림 (ntfy) =================
+function ntfyTopic(){for(const l of Object.values(Store.S.learners||{}))if(l.ntfy)return l.ntfy;try{return localStorage.getItem('hlab_ntfy')||'';}catch(e){return '';}}
+function ntfySet(t){try{t?localStorage.setItem('hlab_ntfy',t):localStorage.removeItem('hlab_ntfy');}catch(e){}
+ Object.values(Store.S.learners||{}).forEach(l=>Store.put('learners',l.id,Object.assign({},l,{ntfy:t||'',updatedAt:Date.now()})));}
+function ntfySend(title,message,tags,topic){const t=topic||ntfyTopic();if(!t)return Promise.resolve(false);
+ try{return fetch('https://ntfy.sh/',{method:'POST',body:JSON.stringify({topic:t,title,message,tags:tags||[]})}).then(r=>r.ok).catch(()=>false);}catch(e){return Promise.resolve(false);}}
+function kidName(L){return (L.name||'').split(' ')[0];}
+function notifyDone(S,data,rec){if(!rec)return;const L=S.L;const min=Math.max(1,Math.round(rec.sec/60));const tr=(TRACK[L.track]||{}).name||'';
+ const pr=data.practice.t?Math.round(data.practice.c/data.practice.t*100):null;
+ const kindTxt=S.free?'다시 풀기':rec.kind==='month'?'월간 평가':rec.kind==='week'?'주간 평가':`${rec.week}주차 ${rec.day}회`;
+ const lines=[`${rec.topic||S.title} · ${kindTxt}`,`⏱ ${min}분`+(pr!==null?` · 첫 시도 정답률 ${pr}%`:'')+(data.test?` · 평가 ${data.test.score}점`:'')];
+ const st=data.stats||{};const extra=[];if(st.idle>=60)extra.push(`쉬었던 시간 ${Math.round(st.idle/60)}분`);if(st.hints)extra.push(`힌트 ${st.hints}번`);if(st.quickWrong>=3)extra.push(`서둘러 틀린 문제 ${st.quickWrong}개`);
+ if(extra.length)lines.push(extra.join(' · '));
+ ntfySend(`✅ ${kidName(L)} ${tr} 끝!`,lines.join('\n'),['white_check_mark']);}
+function notifyQuit(S,rec){const L=S.L;const min=Math.max(1,Math.round(rec.sec/60));
+ ntfySend(`⏸ ${kidName(L)} 중간에 그만뒀어요`,`${S.title}\n${min}분 공부 · ${rec.progress} 단계까지`,['pause_button']);}
+function notifyCard(){const t=ntfyTopic();return `<div class="card" id="ntfycard"><h2 style="margin-top:0">📱 공부 끝 알림</h2>
+ <p style="margin-top:0">아이가 공부를 마치면 보호자 휴대폰으로 <b>걸린 시간·정답률</b>이 알림으로 와요. 무료 알림 앱 <b>ntfy</b>를 써요 (가입 필요 없음).</p>
+ ${t?`<p>알림 켜짐 ✅ 알림 주소: <code class="ntfyt">${esc(t)}</code></p>
+ <ol style="line-height:1.8;padding-left:22px;margin:6px 0"><li>휴대폰에 <b>ntfy</b> 앱 설치 (App Store·Play 스토어)</li><li>앱에서 <b>＋</b> → 위 알림 주소 입력 → 구독</li><li>아래 <b>테스트 알림</b>으로 확인</li></ol>
+ <div class="row"><button class="btn ghost sm" data-ntfy="copy">주소 복사</button><button class="btn sm" data-ntfy="test">테스트 알림 보내기</button><div class="sp"></div><button class="btn ghost sm" data-ntfy="off">알림 끄기</button></div>
+ <p class="small">알림 주소는 우리 집만 아는 무작위 이름이에요. 다른 사람에게 알려 주지 마세요.</p>`
+ :`<div class="row"><button class="btn" data-ntfy="on">알림 켜기</button></div>`}</div>`;}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-ntfy]');if(!b)return;const a=b.dataset.ntfy;
+ const redraw=()=>{const c=$('#ntfycard');if(c)c.outerHTML=notifyCard();};
+ if(a==='on'){const r=Array.from(crypto.getRandomValues(new Uint8Array(10)),x=>'abcdefghijkmnpqrstuvwxyz23456789'[x%32]).join('');ntfySet('hs-'+r);redraw();}
+ else if(a==='off'){ntfySet('');redraw();toast('알림을 껐어요');}
+ else if(a==='copy'){navigator.clipboard.writeText(ntfyTopic()).then(()=>toast('복사했어요')).catch(()=>toast('주소를 길게 눌러 복사해 주세요'));}
+ else if(a==='test'){const ok=await ntfySend('🔔 우리집 공부방','알림이 잘 와요! 아이가 공부를 마치면 이렇게 알려 드릴게요.',['bell']);toast(ok?'보냈어요. 휴대폰을 확인해 보세요':'보내지 못했어요. 인터넷 연결을 확인해 주세요');}});
 
 // ================= 시작 =================
 // ================= 이메일 로그인 + Supabase 저장 (독립 버전 전용) =================
