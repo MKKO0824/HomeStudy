@@ -1064,7 +1064,7 @@ function viewHome(el){const Ls=Object.values(Store.S.learners).sort((a,b)=>(a.cr
   <div class="bubble">${esc(pick(BUDDY_LINES)(topicOf(L,p.week).replace(/^[^·]*· /,'')))}<span>— ${BUDDY[buddyOf(L)].name} Lv.${buddyLevel(L)}</span></div><div class="topic"><b>${esc(topicOf(L,p.week))}</b><span>${p.week}주차 · 이번 주 ${thisWeek}/5회${doneToday?' · 오늘 완료 ✅':''}</span></div>
   <ol class="path">${stones}</ol>
   <button class="go ${p.kind==='study'?'':'test'}" data-start="${L.id}">${goTxt}</button>
-  <div class="sub"><button data-free="${L.id}">🔁 지난 단원</button><button data-paper="${L.id}">📝 종이 학습지</button><button data-rep="${L.id}">📊 기록·평가</button><button class="stk-count" data-book="${L.id}">🎖️ 스티커북 ${stkN}장</button></div></article>`;}).join('')}
+  <div class="sub"><button data-free="${L.id}">🔁 단원 고르기</button><button data-paper="${L.id}">📝 종이 학습지</button><button data-rep="${L.id}">📊 기록·평가</button><button class="stk-count" data-book="${L.id}">🎖️ 스티커북 ${stkN}장</button></div></article>`;}).join('')}
   <button class="addkid" id="add">+ 공부할 친구 추가</button></div>`;
  $('#add').onclick=()=>gate(()=>editLearner());
  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>gate(()=>editLearner(Store.S.learners[b.dataset.edit])));
@@ -1394,14 +1394,18 @@ const Snd={ctx:null,master:null,music:null,on:true,musicOn:false,timer:null,step
   else if(kind==='no'){this.tone(330,.16,{vol:.12});this.tone(262,.22,{vol:.12,at:.12});}
   else if(kind==='tap')this.tone(660,.06,{vol:.06,type:'triangle'});
   else if(kind==='win'){[523,659,784,1046,1318].forEach((f,i)=>this.tone(f,.28,{type:'triangle',at:i*.09,vol:.16}));}},
- // 잔잔한 오음음계 음악: 4마디 진행 위에 조금씩 바뀌는 멜로디
+ // 오르골 자장가: 8마디를 정해 둔 곡으로 되풀이 (C–Am–F–G–C–Am–Dm–G)
+ bell(m,d,vol,at){const f=440*Math.pow(2,(m-69)/12);this.tone(f,d,{type:'sine',vol,at,dest:this.music});this.tone(f*2,d*0.45,{type:'sine',vol:vol*0.22,at,dest:this.music});this.tone(f*3,d*0.2,{type:'sine',vol:vol*0.08,at,dest:this.music});},
  startMusic(){if(!this.musicOn||!this.ensure()||this.timer)return;if(this.ctx.state==='suspended')this.ctx.resume();
-  const scale=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];const chords=[[130.8,196,261.6],[110,164.8,220],[87.3,130.8,174.6],[98,146.8,196]];let pos=3;
-  const beat=0.5;let next=this.ctx.currentTime+0.1;
-  this.timer=setInterval(()=>{while(next<this.ctx.currentTime+0.6){const s=this.step++;const bar=Math.floor(s/8)%4;
-    if(s%8===0)chords[bar].forEach(f=>this.tone(f,beat*7.5,{type:'sine',vol:.35,at:next-this.ctx.currentTime,dest:this.music}));
-    if(Math.random()<0.72){pos=Math.max(0,Math.min(scale.length-1,pos+pick([-2,-1,-1,0,1,1,2])));this.tone(scale[pos],beat*1.6,{type:'triangle',vol:.5,at:next-this.ctx.currentTime,dest:this.music});}
-    next+=beat;}},200);},
+  if(!this.dl){try{const c=this.ctx;this.dl=c.createDelay(1);this.dl.delayTime.value=0.375;const fb=c.createGain();fb.gain.value=0.28;const wet=c.createGain();wet.gain.value=0.35;this.music.connect(this.dl);this.dl.connect(fb);fb.connect(this.dl);this.dl.connect(wet);wet.connect(this.master);}catch(e){}}
+  const roots=[48,45,41,43,48,45,50,43],minor=[0,1,0,0,0,1,1,0];
+  const mel=[[76,0,79,0],[81,79,76,0],[77,76,74,72],[74,0,0,0],[76,79,84,0],[81,0,76,0],[77,74,76,77],[74,0,67,0]];
+  const e8=0.375;let next=this.ctx.currentTime+0.15;this.step=0;
+  this.timer=setInterval(()=>{while(next<this.ctx.currentTime+0.8){const s=this.step++;const bar=Math.floor(s/8)%8,i=s%8;const at=next-this.ctx.currentTime;
+    const iv=minor[bar]?[0,7,12,15,12,7,12,7]:[0,7,12,16,12,7,12,7];this.bell(roots[bar]+12+iv[i],1.1,i===0?.22:.13,at);
+    if(i===0)this.tone(440*Math.pow(2,(roots[bar]-69)/12),e8*7,{type:'sine',vol:.2,at,dest:this.music});
+    if(i%2===0){const m=mel[bar][i/2];if(m)this.bell(m,1.6,.42,at);}
+    next+=e8;}},150);},
  stopMusic(){clearInterval(this.timer);this.timer=null;},
  duck(sec){if(!this.ctx||!this.music)return;const g=this.music.gain,t=this.ctx.currentTime;g.cancelScheduledValues(t);g.setTargetAtTime(0.008,t,0.08);g.setTargetAtTime(0.05,t+sec,0.4);},
  toggleMusic(){this.musicOn=!this.musicOn;this.save();if(this.musicOn)this.startMusic();else this.stopMusic();App.status&&App.status();soundBtns();}};
@@ -1473,8 +1477,8 @@ function injectContent(items){items.forEach(c=>{const d=c.data||{};if(c.status!=
 function freeOptions(L){const p=plan(L);if(L.track==='hangul'){const out=[];for(let w=1;w<=Math.min(p.week,HW.length+1);w++)out.push({key:w,label:`${w}주차 · ${hWeek(w).t}`,done:w<p.week,cur:w===p.week});return out;}
  return unitStarts(L.track).map((x,i)=>({key:i,label:uLabel(x.u),done:x.week+(x.u.w||2)-1<p.week,cur:x.week<=p.week&&p.week<x.week+(x.u.w||2)})).filter(o=>o.done||o.cur);}
 async function chooseFree(id){const L=Store.S.learners[id];const opts=freeOptions(L);
- const html=`<h2>🔁 지난 단원 다시 풀기</h2><p class="muted" style="margin-top:0">끝낸 단원의 새 문제를 풀어요. 진도는 그대로이고, 기록은 "연습"으로 남아요.</p><div class="freelist">${opts.slice().reverse().map(o=>`<button data-free="${o.key}" class="${o.cur?'cur':''}"><span>${o.done?'✅':'📍'}</span>${esc(o.label)}</button>`).join('')}</div>`;
- const m=$('#modal');const p=modal(html,[{t:'닫기',v:0,cls:'ghost'}]);m.querySelectorAll('[data-free]').forEach(b=>b.onclick=()=>{m.classList.add('hidden');startFree(id,+b.dataset.free);});await p;}
+ const html=`<h2>🔁 단원 고르기</h2><p class="muted" style="margin-top:0">끝낸 단원이나 지금 단원(📍)을 골라 <b>새 문제</b>로 한 번 더 풀어요. 진도는 그대로이고, 기록은 "연습"으로 남아요.</p><div class="freelist">${opts.slice().reverse().map(o=>`<button data-free="${o.key}" class="${o.cur?'cur':''}"><span>${o.done?'✅':'📍'}</span>${esc(o.label)}</button>`).join('')}</div>`;
+ const nx=nextUnitDone(L);const m=$('#modal');const p=modal(html+(nx!==null?`<p class="small" style="margin:14px 0 0">이미 잘 아는 단원이면 건너뛸 수 있어요.</p>`:''),[...(nx!==null?[{t:'⏭ 다음 단원으로 넘어가기',v:'skip',cls:'ghost'}]:[]),{t:'닫기',v:0,cls:'ghost'}]);m.querySelectorAll('[data-free]').forEach(b=>b.onclick=()=>{m.classList.add('hidden');startFree(id,+b.dataset.free);});const r=await p;if(r&&r.v==='skip')gate(()=>skipUnit(id));}
 function buildFree(L,key){if(L.track==='hangul'){const W=hWeek(key),K=hKnown(key,5);return {title:`🔁 다시 풀기 · ${key}주차 ${W.t}`,blocks:[
   {type:'learn',title:'글자 다시 보기',mins:5,cards:W.chunks.flat().flatMap(s=>learnCards(s,K)).slice(0,8),K},
   {type:'quiz',title:'글자 놀이',mins:15,mode:'practice',items:hItems(W,K,12)},
@@ -1614,6 +1618,14 @@ function stickerBook(id,newRec,mode){const L=Store.S.learners[id];if(!L)return A
   sn.onpointerup=e=>{if(!drag)return;drag=false;const p=inBook(e.clientX-ox,e.clientY-oy);if(p)stick(p.x,p.y);else{sn.classList.remove('lift');sn.style.transform='';sn._x0=sn._y0=0;toast('스티커북 위에 놓아 주세요');}};
   bk.onclick=e=>{const p=inBook(e.clientX,e.clientY);if(p&&!placed)stick(p.x,p.y);};}
  draw();if(newRec&&!placed&&L.track==='hangul')Voice.say('스티커를 붙여 볼까요?');}
+
+// ================= 다음 단원으로 건너뛰기 =================
+function nextUnitDone(L){const p=plan(L);if(L.track==='hangul'){return p.week<HW.length+4?p.week*5:null;}
+ const st=unitStarts(L.track);const nx=st.find(x=>x.week>p.week);return nx?(nx.week-1)*5:null;}
+async function skipUnit(id){const L=Store.S.learners[id];const d=nextUnitDone(L);if(d===null)return;const np=plan({done:d,startWeek:L.startWeek});
+ const label=L.track==='hangul'?`${np.week}주차 · ${hWeek(np.week).t}`:uLabel(unitAt(L.track,np.week).u);
+ const c=await modal(`<h2>다음 단원으로 넘어갈까요?</h2><p><b>${esc(label)}</b>부터 시작해요. 지금 단원의 남은 회차는 건너뛰어요. 필요하면 나중에 '단원 고르기'에서 다시 풀 수 있어요.</p>`,[{t:'취소',v:0,cls:'ghost'},{t:'넘어가기',v:1}]);
+ if(!c.v)return;Store.put('learners',L.id,Object.assign({},L,{done:d,updatedAt:Date.now()}));toast('다음 단원으로 넘어갔어요');App.go('home');}
 
 // ================= 시작 =================
 // ================= 이메일 로그인 + Supabase 저장 (독립 버전 전용) =================
