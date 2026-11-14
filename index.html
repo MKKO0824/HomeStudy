@@ -200,6 +200,21 @@ textarea,input[type=text],input[type=number],select{font-family:inherit;font-siz
 .login .mascot{width:110px;height:110px}.login h1{margin:0;font-size:34px}.login .card{width:100%;text-align:left}
 .login a{color:var(--blue)}
 input[type=email]{font-family:inherit;font-size:18px;padding:12px 14px;border-radius:14px;border:2px solid var(--line);width:100%;background:#fff;color:var(--ink)}
+
+.ava svg{width:52px;height:52px}
+.bubble{position:relative;background:var(--cbg);border-radius:16px;padding:10px 14px;font-size:15px;font-weight:700;color:var(--ink)}
+.bubble span{display:block;font-size:12px;font-weight:400;color:var(--mute);margin-top:2px}
+.bubble::before{content:'';position:absolute;top:-8px;left:30px;border:8px solid transparent;border-top:0;border-bottom-color:var(--cbg)}
+.buddy-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.buddy-pick button{border:3px solid var(--line);border-radius:18px;background:#fff;padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.buddy-pick button svg{width:58px;height:58px}.buddy-pick b{font-size:15px}.buddy-pick span{font-size:11px;color:var(--mute);text-align:center;line-height:1.3}
+.buddy-pick button.on{border-color:var(--blue);background:#F1F5FF}
+.freelist{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}
+.freelist button{text-align:left;padding:12px 14px;border-radius:14px;border:2px solid var(--line);background:#fff;font-weight:700;display:flex;gap:10px;align-items:center}
+.freelist button.cur{border-color:var(--blue)}
+.wb svg{width:34px;height:34px;vertical-align:middle;margin-right:4px}
+.sumb{display:flex;flex-direction:column;align-items:center;gap:4px}.sumb svg{width:90px;height:90px}.sumb span{font-size:13px;color:var(--mute);font-weight:700}
+button.chip{cursor:pointer;font-weight:700}
 </style></head><body><div id="app"></div><div id="modal" class="modal hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.STANDALONE=true;
@@ -1008,43 +1023,45 @@ const App={view:'home',lid:null,sess:null,curTab:'m2',
  go(v,lid){this.view=v;if(lid)this.lid=lid;this.render();window.scrollTo(0,0);},
  render(){if(this.view==='session'&&this.sess)return;const app=$('#app');
   const nav=['home:🏠 학습','report:📊 기록·평가','plan:🗓️ 커리큘럼','help:💡 사용법'].map(x=>{const [k,t]=x.split(':');return `<button class="${this.view===k?'on':''}" data-nav="${k}">${t}</button>`;}).join('');
-  app.innerHTML=`<div class="wrap"><div class="top"><div class="logo">${MASCOT()}우리집 공부방</div><span class="chip" id="st"></span><div class="nav">${nav}</div></div><div id="main"></div></div>`;
-  app.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>this.go(b.dataset.nav));this.status();
-  ({home:viewHome,report:viewReport,plan:viewPlan,help:viewHelp})[this.view]($('#main'));}};
+  app.innerHTML=`<div class="wrap"><div class="top"><div class="logo">${MASCOT()}우리집 공부방</div><button class="chip" data-music></button><span class="chip" id="st"></span><div class="nav">${nav}</div></div><div id="main"></div></div>`;
+  app.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{const v=b.dataset.nav;if(v==='report'||v==='help')gate(()=>this.go(v));else this.go(v);});this.status();
+  app.querySelectorAll('[data-music]').forEach(b=>b.onclick=()=>Snd.toggleMusic());soundBtns();
+  ({home:viewHome,report:viewReport,plan:viewPlan,help:viewHelp,review:viewReview})[this.view]($('#main'));}};
 
 function viewHome(el){const Ls=Object.values(Store.S.learners).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
  const d=new Date();const dstr=`${d.getMonth()+1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일`;
  if(!Ls.length){el.innerHTML=`<div class="hello"><div class="mascot">${MASCOT('wow')}</div><div><h1>반가워요! 저는 반짝이예요</h1><p>함께 공부할 친구를 먼저 등록해 주세요.</p></div></div>
   <div class="card empty"><p class="muted" style="margin-top:0">초2 수학·국어(3·4학년까지 이어져요), 초3 수학, 한글을 처음 배우는 6~7세 과정이 있어요.<br>아이마다 따로 등록하면 진도와 평가가 따로 기록돼요.</p><button class="btn" id="add">공부할 친구 등록하기</button></div>`;$('#add').onclick=()=>editLearner();return;}
  el.innerHTML=`<div class="hello"><div class="mascot">${MASCOT()}</div><div><h1>오늘도 한 걸음씩!</h1><p>${dstr} · 누가 공부할 차례일까요?</p></div></div>
- <div class="kids">${Ls.map(L=>{const T=TRACK[L.track],p=plan(L);const rs=recsOf(L.id);const wk=weekKey(today());const thisWeek=rs.filter(r=>weekKey(r.date)===wk).length;const doneToday=rs.some(r=>r.date===today());
-  const wrs=rs.filter(r=>r.week===p.week);const byDay={};wrs.forEach(r=>byDay[r.day]=r);const stkN=rs.filter(r=>r.sticker).length;
+ <div class="kids">${Ls.map(L=>{const T=TRACK[L.track],p=plan(L);const rs=recsOf(L.id);const wk=weekKey(today());const thisWeek=rs.filter(r=>isMain(r)&&weekKey(r.date)===wk).length;const doneToday=rs.some(r=>isMain(r)&&r.date===today());
+  const wrs=rs.filter(r=>isMain(r)&&r.week===p.week);const byDay={};wrs.forEach(r=>byDay[r.day]=r);const stkN=rs.filter(r=>r.sticker).length;
   const stones=[1,2,3,4,5].map(dd=>{const r=byDay[dd];const isTest=dd===5;const cls=dd<p.day?'done':dd===p.day?'now':'';
    const inner=dd<p.day?`<span>${r&&r.sticker?r.sticker:'⭐'}</span>`:dd===p.day?(isTest?(p.kind==='month'?'🏆':'평'):dd):(isTest?'🏁':'');
    return `<li class="stone ${cls} ${isTest?'test':''}"><i>${inner}</i><small>${isTest?(p.kind==='month'&&dd===p.day?'월간 평가':'평가'):dd+'회'}</small></li>`;}).join('');
   const goTxt=p.kind==='study'?(doneToday?'한 번 더 하기':'오늘 공부 시작'):p.kind==='week'?'주간 평가 보기':'월간 평가 보기';
-  return `<article class="kid" style="--c:${T.color};--cbg:${T.bg}"><header><div class="ava">${L.emoji||T.av}</div><div><h2>${esc(L.name)}</h2><span class="trk">${T.name}</span></div><button class="icon" data-edit="${L.id}" aria-label="설정">⚙️</button></header>
-  <div class="topic"><b>${esc(topicOf(L,p.week))}</b><span>${p.week}주차 · 이번 주 ${thisWeek}/5회${doneToday?' · 오늘 완료 ✅':''}</span></div>
+  return `<article class="kid" style="--c:${T.color};--cbg:${T.bg}"><header><div class="ava">${buddySVG(buddyOf(L),'smile',buddyLevel(L))}</div><div><h2>${esc(L.name)}</h2><span class="trk">${T.name}</span></div><button class="icon" data-edit="${L.id}" aria-label="설정">⚙️</button></header>
+  <div class="bubble">${esc(pick(BUDDY_LINES)(topicOf(L,p.week).replace(/^[^·]*· /,'')))}<span>— ${BUDDY[buddyOf(L)].name} Lv.${buddyLevel(L)}</span></div><div class="topic"><b>${esc(topicOf(L,p.week))}</b><span>${p.week}주차 · 이번 주 ${thisWeek}/5회${doneToday?' · 오늘 완료 ✅':''}</span></div>
   <ol class="path">${stones}</ol>
   <button class="go ${p.kind==='study'?'':'test'}" data-start="${L.id}">${goTxt}</button>
-  <div class="sub"><button data-paper="${L.id}">📝 종이 학습지</button><button data-rep="${L.id}">📊 기록·평가</button><span class="stk-count">🎖️ 스티커 ${stkN}개</span></div></article>`;}).join('')}
+  <div class="sub"><button data-free="${L.id}">🔁 지난 단원</button><button data-paper="${L.id}">📝 종이 학습지</button><button data-rep="${L.id}">📊 기록·평가</button><span class="stk-count">🎖️ 스티커 ${stkN}개</span></div></article>`;}).join('')}
   <button class="addkid" id="add">+ 공부할 친구 추가</button></div>`;
- $('#add').onclick=()=>editLearner();
- el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editLearner(Store.S.learners[b.dataset.edit]));
+ $('#add').onclick=()=>gate(()=>editLearner());
+ el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>gate(()=>editLearner(Store.S.learners[b.dataset.edit])));
+ el.querySelectorAll('[data-free]').forEach(b=>b.onclick=()=>chooseFree(b.dataset.free));
  el.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>startCheck(b.dataset.start,'tablet'));
  el.querySelectorAll('[data-paper]').forEach(b=>b.onclick=()=>startCheck(b.dataset.paper,'paper'));
- el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>App.go('report',b.dataset.rep));}
+ el.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>gate(()=>App.go('report',b.dataset.rep)));}
 
 function startField(tr,curWeek){if(tr==='hangul')return `<label>시작(현재) 주차 — 이미 아는 글자가 있으면 건너뛸 수 있어요</label><input type="number" name="week" min="1" max="60" value="${curWeek||1}">`;
  const st=unitStarts(tr);const rec=schoolUnit(tr,new Date());const sel=curWeek?st.reduce((a,x,i)=>x.week<=curWeek?i:a,0):(rec>=0?rec:0);
  return `<label>어느 단원부터 할까요? ${rec>=0?'<b style="color:var(--blue)">⭐ = 지금 학교 진도(추정)</b>':''}</label><select name="week">${st.map((x,i)=>`<option value="${x.week}" ${i===sel?'selected':''}>${i===rec?'⭐ ':''}${uLabel(x.u)} (${x.u.w||2}주)</option>`).join('')}</select><p class="note">학교 진도는 학교·반마다 조금씩 달라요. 아이 교과서나 알림장을 보고 맞춰 주세요. 고른 단원부터 순서대로 이어지고, 학기 단원이 끝나면 다음 학기로 넘어가서 자연스럽게 선행이 돼요.</p>`;}
 
 async function editLearner(L){const isNew=!L;L=L?JSON.parse(JSON.stringify(L)):{id:'L'+Date.now().toString(36),name:'',track:'m2',done:0,createdAt:Date.now()};
- const emojis=['🐻','🐰','🦊','🐯','🐼','🐨','🦄','🐬','🐥','🦖','🚀','🌸'];let tr=L.track,em=L.emoji||'🐻';
+ const emojis=['🐻','🐰','🦊','🐯','🐼','🐨','🦄','🐬','🐥','🦖','🚀','🌸'];let tr=L.track,em=L.buddy||'star';
  const draw=()=>`<h2>${isNew?'학습자 추가':'학습자 설정'}</h2>
  <div class="field"><label>이름</label><input type="text" name="name" value="${esc(L.name)}" placeholder="예: 서준 수학" maxlength="12"></div>
  <div class="field"><label>과정</label><div class="opt" id="tr">${Object.entries(TRACK).map(([k,t])=>`<button data-k="${k}" class="${tr===k?'on':''}"><b>${t.av} ${t.full||t.name}</b><span>${t.desc}</span></button>`).join('')}</div></div>
- <div class="field"><label>캐릭터</label><div class="emo-pick" id="em">${emojis.map(e=>`<button data-e="${e}" class="${e===em?'on':''}">${e}</button>`).join('')}</div></div>
+ <div class="field"><label>공부 친구 고르기</label><div class="buddy-pick" id="em">${Object.entries(BUDDY).map(([k,b])=>`<button data-e="${k}" class="${k===em?'on':''}">${buddySVG(k)}<b>${b.name}</b><span>${b.desc}</span></button>`).join('')}</div></div>
  <div class="field" id="startf">${startField(tr,isNew?null:Math.floor(L.done/5)+1)}</div>
  ${isNew?'':'<p class="note">주차를 바꾸면 해당 주차의 1회차부터 다시 시작해요. 지난 기록은 그대로 남아요.</p>'}`;
  const m=$('#modal');const bind=()=>{m.querySelectorAll('#tr [data-k]').forEach(b=>b.onclick=()=>{tr=b.dataset.k;m.querySelectorAll('#tr button').forEach(x=>x.classList.toggle('on',x.dataset.k===tr));$('#startf').innerHTML=startField(tr,(!isNew&&tr===L.track)?Math.floor(L.done/5)+1:null);});
@@ -1053,20 +1070,21 @@ async function editLearner(L){const isNew=!L;L=L?JSON.parse(JSON.stringify(L)):{
  if(r.v==='del'){const c=await modal(`<h2>정말 삭제할까요?</h2><p>${esc(L.name)}의 학습 기록도 모두 지워져요.</p>`,[{t:'취소',v:0,cls:'ghost'},{t:'삭제',v:1,cls:''}]);if(c.v){recsOf(L.id).forEach(x=>Store.del('records',x.id));Store.del('learners',L.id);App.render();}return;}
  if(r.v!=='ok')return;const name=(r.data.name||'').trim();if(!name){toast('이름을 입력해 주세요');return editLearner(isNew?null:L);}
  const wk=Math.max(1,Math.min(60,parseInt(r.data.week)||1));const changedWeek=wk!==Math.floor(L.done/5)+1||tr!==L.track;
- Object.assign(L,{name,track:tr,emoji:em,updatedAt:Date.now()});if(changedWeek){L.done=(wk-1)*5;L.startWeek=wk;}Store.put('learners',L.id,L);App.render();}
+ Object.assign(L,{name,track:tr,buddy:em,updatedAt:Date.now()});if(changedWeek){L.done=(wk-1)*5;L.startWeek=wk;}Store.put('learners',L.id,L);App.render();}
 
-async function startCheck(id,mode){const L=Store.S.learners[id];const rs=recsOf(id);const wk=weekKey(today());const n=rs.filter(r=>weekKey(r.date)===wk).length;
- if(rs.some(r=>r.date===today())){const c=await modal('<h2>오늘은 이미 공부했어요 🙌</h2><p>하루 1회(최대 1시간)를 권장해요. 그래도 한 회 더 할까요?</p>',[{t:'다음에',v:0,cls:'ghost'},{t:'한 회 더',v:1}]);if(!c.v)return;}
+async function startCheck(id,mode){const L=Store.S.learners[id];const rs=recsOf(id);const wk=weekKey(today());const n=rs.filter(r=>isMain(r)&&weekKey(r.date)===wk).length;
+ if(rs.some(r=>isMain(r)&&r.date===today())){const c=await modal('<h2>오늘은 이미 공부했어요 🙌</h2><p>하루 1회(최대 1시간)를 권장해요. 그래도 한 회 더 할까요?</p>',[{t:'다음에',v:0,cls:'ghost'},{t:'한 회 더',v:1}]);if(!c.v)return;}
  else if(n>=5){const c=await modal('<h2>이번 주 5회를 모두 마쳤어요 🎉</h2><p>주 5회가 목표예요. 쉬는 것도 공부예요! 그래도 진행할까요?</p>',[{t:'쉬기',v:0,cls:'ghost'},{t:'진행',v:1}]);if(!c.v)return;}
- Voice.say('');const S=buildSession(L);S.L=L;S.plan=plan(L);S.mode=mode;S.start=Date.now();S.bi=0;S.res=[];S.trace=0;App.sess=S;App.view='session';
+ Voice.say('');const S=buildSession(L);S.L=L;S.plan=plan(L);S.mode=mode;S.start=Date.now();S.bi=0;S.res=[];S.trace=0;S.idle=0;App.sess=S;App.view='session';
  if(mode==='paper')return paperView(S);runSession();}
 
 // ================= 세션 진행 =================
 let timerInt=null;
 function runSession(){const S=App.sess;const app=$('#app');const T=TRACK[S.L.track];
- app.innerHTML=`<div class="wrap" style="--c:${T.color};--cbg:${T.bg}"><div class="sbar"><button class="btn ghost sm" id="quit">✕ 그만하기</button><div class="who">${S.L.emoji||T.av} ${esc(S.L.name)}</div><div class="steps">${S.blocks.map((b,i)=>`<div class="step" data-s="${i}">${b.title}</div>`).join('')}</div><div class="timer" id="tm">00:00</div></div><div class="small" style="margin:-6px 0 12px">${esc(S.title)}</div><div id="blk"></div></div>`;
- $('#quit').onclick=async()=>{const c=await modal('<h2>공부를 멈출까요?</h2><p>지금까지 푼 내용은 저장되지 않아요. 회차도 넘어가지 않아요.</p>',[{t:'계속하기',v:0},{t:'그만하기',v:1,cls:'ghost'}]);if(c.v){clearInterval(timerInt);App.sess=null;App.go('home');}};
- clearInterval(timerInt);timerInt=setInterval(()=>{const s=Math.floor((Date.now()-S.start)/1000);const e=$('#tm');if(!e)return clearInterval(timerInt);e.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');e.classList.toggle('over',s>=3600);
+ app.innerHTML=`<div class="wrap" style="--c:${T.color};--cbg:${T.bg}"><div class="sbar"><button class="btn ghost sm" id="quit">✕ 그만하기</button><div class="who"><span class="wb">${buddySVG(buddyOf(S.L),'smile',buddyLevel(S.L))}</span>${esc(S.L.name)}</div><div class="steps">${S.blocks.map((b,i)=>`<div class="step" data-s="${i}">${b.title}</div>`).join('')}</div><button class="chip" data-music></button><div class="timer" id="tm">00:00</div></div><div class="small" style="margin:-6px 0 12px">${esc(S.title)}</div><div id="blk"></div></div>`;
+ document.querySelectorAll('[data-music]').forEach(b=>b.onclick=()=>Snd.toggleMusic());soundBtns();if(Snd.musicOn)Snd.startMusic();Snd.lastAct=Date.now();
+ $('#quit').onclick=async()=>{const c=await modal('<h2>공부를 멈출까요?</h2><p>회차는 넘어가지 않아요. 다음에 이 회차를 처음부터 다시 해요.</p>',[{t:'계속하기',v:0},{t:'그만하기',v:1,cls:'ghost'}]);if(c.v){clearInterval(timerInt);saveQuit(S);App.sess=null;App.go('home');}};
+ clearInterval(timerInt);timerInt=setInterval(()=>{const s=Math.floor((Date.now()-S.start)/1000);const e=$('#tm');if(!e)return clearInterval(timerInt);e.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');if(Snd.lastAct&&Date.now()-Snd.lastAct>45000)S.idle=(S.idle||0)+1;e.classList.toggle('over',s>=3600);
   if(s===3600)toast('1시간이 되었어요. 오늘은 여기까지 해도 좋아요!');},1000);
  showBlock();}
 function stepsUI(){const S=App.sess;document.querySelectorAll('.step').forEach((e,i)=>{e.classList.toggle('on',i===S.bi);e.classList.toggle('ok',i<S.bi);});}
@@ -1114,7 +1132,7 @@ function blockQuiz(el,b){const S=App.sess;const isKid=S.L.track==='hangul';const
  el.innerHTML=`<div class="stage ${usePad?'withpad':''}"><div class="card qcard" id="qc"></div>${usePad?`<div class="card pad"><div class="padbar"><b>✏️ 연습장</b><span class="small">세로셈·그림으로 직접 풀어요</span><div class="sp"></div><button class="btn ghost sm" id="pu">↶</button><button class="btn ghost sm" id="pclr">지우기</button></div><canvas id="pc"></canvas><div class="small">손가락이나 터치펜으로 써요. 다음 문제로 넘어가면 깨끗해져요.</div></div>`:''}</div>`;
  if(usePad){pad=makePad($('#pc'),{grid:true});$('#pclr').onclick=()=>pad.clear();$('#pu').onclick=()=>pad.undo();}
  if(b.note)toast(b.note);
- const show=()=>{const it=b.items[i];let tries=0;let val=it.kind==='multi'?it.labels.map(()=>''):[''];let fi=0;let bsel={c:null,v:null,j:it.jongs?'없음':''};
+ const show=()=>{const it=b.items[i];let tries=0;const t0=Date.now();let fms=0;let val=it.kind==='multi'?it.labels.map(()=>''):[''];let fi=0;let bsel={c:null,v:null,j:it.jongs?'없음':''};
   const qc=$('#qc');const head=`<div class="qhead"><span class="qnum">${b.title} ${i+1} / ${b.items.length}</span><div class="pbar"><i style="width:${i/b.items.length*100}%"></i></div>${test?'<span class="tag" style="background:var(--pu)">평가</span>':''}</div>`;
   let body=`<div class="qtext">${it.q}</div>`;
   if(it.say||it.kid)body+=`<div class="row" style="justify-content:center"><button class="speak" id="say">🔊 ${it.skill==='h_listen'||it.skill==='h_build'||it.speakAns?'다시 듣기':'문제 듣기'}</button></div>`;
@@ -1125,7 +1143,7 @@ function blockQuiz(el,b){const S=App.sess;const isKid=S.L.track==='hangul';const
   const tools=`<div class="qtools">${!test&&it.hint?'<button class="btn ghost sm" id="hint">💡 힌트</button>':''}${it.col&&!test?'<button class="btn ghost sm" id="colb">✏️ 세로셈 틀 보기</button>':''}</div><div id="hb"></div>`;
   qc.innerHTML=head+body+tools;if(pad)pad.clear();
   const speakIt=()=>Voice.say(it.say||'');if(it.say)setTimeout(speakIt,250);const sb=$('#say');if(sb)sb.onclick=speakIt;
-  const hb=$('#hint');if(hb)hb.onclick=()=>{$('#hb').innerHTML=`<div class="hintbox">💡 ${it.hint}</div>`;};
+  const hb=$('#hint');if(hb)hb.onclick=()=>{it._hint=true;$('#hb').innerHTML=`<div class="hintbox">💡 ${it.hint}</div>`;};
   const cb=$('#colb');if(cb)cb.onclick=()=>{$('#hb').innerHTML=`<div class="hintbox center">${vert(it.col[0],it.col[1],it.col[2])}<div class="small">연습장에 이렇게 자리를 맞춰 써서 풀어 보세요.</div></div>`;};
   const fields=()=>qc.querySelectorAll('.afield').forEach((f,k)=>{f.textContent=val[k];f.classList.toggle('on',k===fi);});
   qc.querySelectorAll('.afield').forEach(f=>f.onclick=()=>{fi=+f.dataset.f;fields();});
@@ -1134,19 +1152,19 @@ function blockQuiz(el,b){const S=App.sess;const isKid=S.L.track==='hangul';const
    else if(val[fi].length<7){if(key==='.'&&val[fi].includes('.'))return;val[fi]+=key;}fields();});
   qc.querySelectorAll('[data-k]').forEach(btn=>btn.onclick=()=>{const c=it.choices[+btn.dataset.k];btn.classList.add('sel');submit(c.v,btn);});
   if(it.kind==='dict'){const dp=makePad($('#dc'),{lines:true,width:3.6});$('#dclr').onclick=()=>dp.clear();$('#dok').onclick=()=>{$('#dact').innerHTML=`<div class="reveal" style="background:#EEF4FF;width:100%;text-align:center"><div class="small">정답</div><div class="jua" style="font-size:30px">${esc(it.a)}</div><div class="small">띄어쓰기·받침·문장 부호까지 맞았는지 같이 확인해요.</div></div><div class="row" style="justify-content:center;width:100%"><button class="btn gr" id="dyes">⭕ 맞게 썼어요</button><button class="btn ghost" id="dno">❌ 틀린 곳이 있어요</button></div>`;
-   $('#dyes').onclick=()=>{res[i]={ok:true};flash('⭐');setTimeout(advance,600);};$('#dno').onclick=()=>{res[i]={ok:false};toast('틀린 낱말을 공책에 3번 써 봐요');setTimeout(advance,900);};};}
+   $('#dyes').onclick=()=>{res[i]={ok:true,ms:Date.now()-t0,fms:Date.now()-t0,tries:1};Snd.fx('ok');flash('⭐');setTimeout(advance,600);};$('#dno').onclick=()=>{res[i]={ok:false,ms:Date.now()-t0,fms:Date.now()-t0,tries:1};toast('틀린 낱말을 공책에 3번 써 봐요');setTimeout(advance,900);};};}
   if(it.kind==='build'){const upd=()=>{const bp=$('#bp');bp.textContent=bsel.c&&bsel.v?compose(bsel.c,bsel.v,bsel.j==='없음'?'':bsel.j):(bsel.c||'')+(bsel.v||'');};
    qc.querySelectorAll('[data-bc]').forEach(x=>x.onclick=()=>{bsel.c=x.dataset.bc;qc.querySelectorAll('[data-bc]').forEach(y=>y.classList.toggle('on',y===x));upd();Voice.say(CNAME[bsel.c]||'');});
    qc.querySelectorAll('[data-bv]').forEach(x=>x.onclick=()=>{bsel.v=x.dataset.bv;qc.querySelectorAll('[data-bv]').forEach(y=>y.classList.toggle('on',y===x));upd();Voice.say(compose('ㅇ',bsel.v,''));});
    qc.querySelectorAll('[data-bj]').forEach(x=>x.onclick=()=>{bsel.j=x.dataset.bj;qc.querySelectorAll('[data-bj]').forEach(y=>y.classList.toggle('on',y===x));upd();});
    $('#bok').onclick=()=>{if(!bsel.c||!bsel.v)return toast('자음과 모음을 골라요');const s=compose(bsel.c,bsel.v,bsel.j==='없음'?'':bsel.j);submit(s);};}
   function check(v){if(Array.isArray(it.a))return it.a.every((x,k)=>Number(x)===Number(v[k]));if(it.kind==='num')return Number(v)===Number(it.a)&&v!=='';return String(v)===String(it.a);}
-  function submit(v,btn){const ok=check(v);
-   if(test){res[i]={ok,given:v};advance();return;}
-   tries++;if(ok){if(res[i]===null)res[i]={ok:tries===1,given:v};if(btn)btn.classList.add('right');flash(tries===1?'⭐':'👍');if(isKid)Voice.say(pick(['잘했어요!','맞았어요!','최고예요!']));setTimeout(advance,isKid?1100:800);return;}
-   if(btn){btn.classList.remove('sel');btn.classList.add('wrong');btn.disabled=true;}
+  function submit(v,btn){const ok=check(v);if(!fms)fms=Date.now()-t0;const ms=Date.now()-t0;
+   if(test){res[i]={ok,given:v,ms,fms,tries:1};Snd.fx('tap');advance();return;}
+   tries++;if(ok){if(res[i]===null)res[i]={ok:tries===1,given:v,ms,fms,tries,hint:!!it._hint};Snd.fx('ok');if(btn)btn.classList.add('right');flash(tries===1?'⭐':'👍');if(isKid)Voice.say(pick(['잘했어요!','맞았어요!','최고예요!']));setTimeout(advance,isKid?1100:800);return;}
+   Snd.fx('no');if(btn){btn.classList.remove('sel');btn.classList.add('wrong');btn.disabled=true;}
    if(tries===1){flash('🤔');if(isKid)Voice.say('다시 해 볼까요?');else toast('다시 한 번 생각해 볼까요?');if(it.kind==='num'||it.kind==='multi'){val=val.map(()=>'');fi=0;fields();}if(it.hint&&!isKid)$('#hb').innerHTML=`<div class="hintbox">💡 ${it.hint}</div>`;return;}
-   res[i]={ok:false,given:v};const ans=Array.isArray(it.a)?it.a.map((x,k)=>x+it.labels[k]).join(' '):(it.kind==='choice'?(it.choices.find(c=>c.v===it.a)||{h:it.a}).h:it.a);
+   res[i]={ok:false,given:v,ms,fms,tries,hint:!!it._hint};const ans=Array.isArray(it.a)?it.a.map((x,k)=>x+it.labels[k]).join(' '):(it.kind==='choice'?(it.choices.find(c=>c.v===it.a)||{h:it.a}).h:it.a);
    $('#hb').innerHTML=`<div class="reveal">정답은 <b style="font-size:24px">${ans}</b> 이에요. ${!isKid?'연습장에 다시 풀어 보고 넘어가요.':''}</div><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="go">다음 →</button></div>`;
    if(btn)qc.querySelectorAll('[data-k]').forEach(x=>{if(it.choices[+x.dataset.k].v===it.a)x.classList.add('right');});
    if(isKid)Voice.say('괜찮아요. 정답을 같이 봐요.');$('#go').onclick=advance;}
@@ -1158,22 +1176,28 @@ function blockQuiz(el,b){const S=App.sess;const isKid=S.L.track==='hangul';const
  show();}
 function flash(e){const f=document.createElement('div');f.className='fb';
  if(e==='⭐'||e==='👍'){const cols=['#FFC94A','#2F6BFF','#FF6B5E','#16B886','#7B61FF'];let cf='';for(let k=0;k<16;k++){const a=k/16*Math.PI*2,r=120+Math.random()*60;cf+=`<span class="cf" style="background:${cols[k%5]};--x:${(Math.cos(a)*r).toFixed(0)}px;--y:${(Math.sin(a)*r).toFixed(0)}px"></span>`;}
-  f.innerHTML=`${e==='⭐'?cf:''}<div class="pop">${MASCOT('wow')}</div><div class="msg">${pick(e==='⭐'?['정답!','최고예요!','맞았어요!','멋져요!']:['좋아요!','해냈어요!'])}</div>`;}
+  f.innerHTML=`${e==='⭐'?cf:''}<div class="pop">${buddyNow('wow')}</div><div class="msg">${pick(e==='⭐'?['정답!','최고예요!','맞았어요!','멋져요!']:['좋아요!','해냈어요!'])}</div>`;}
  else{const q=document.querySelector('.qcard');if(q){q.classList.remove('shake');void q.offsetWidth;q.classList.add('shake');}return;}
  document.body.appendChild(f);setTimeout(()=>f.remove(),900);}
 
 // ---------- 결과 저장 ----------
-function collect(S){const skills={},wrong=[];let pc=0,pt=0,tc=0,tt=0;
+function collect(S){const skills={},wrong=[];let pc=0,pt=0,tc=0,tt=0;const st={n:0,ms:0,hints:0,quickWrong:0,retryWin:0,finalWrong:0};
  S.blocks.forEach(b=>{if(b.type!=='quiz'||!b.res)return;b.items.forEach((it,k)=>{const r=b.res[k];const ok=!!(r&&r.ok);skills[it.skill]=skills[it.skill]||[0,0];skills[it.skill][1]++;if(ok)skills[it.skill][0]++;
-  if(b.mode==='test'){tt++;if(ok)tc++;}else{pt++;if(ok)pc++;}if(!ok)wrong.push(it.tag||it.skill);});});
- return {skills,wrong:wrong.slice(0,40),practice:{c:pc,t:pt},test:tt?{c:tc,t:tt,score:Math.round(tc/tt*100)}:null};}
+  if(b.mode==='test'){tt++;if(ok)tc++;}else{pt++;if(ok)pc++;}if(!ok)wrong.push(it.tag||it.skill);
+  if(r&&r.ms!=null){st.n++;st.ms+=Math.min(r.ms,180000);if(r.hint)st.hints++;if(!ok&&r.fms<3000&&it.kind!=='dict')st.quickWrong++;if(r.tries>1&&r.ok===false&&b.mode!=='test'&&r.given!==undefined&&check2(it,r.given))st.retryWin++;else if(r.tries>1&&!check2(it,r.given))st.finalWrong++;}});});
+ return {skills,wrong:wrong.slice(0,40),practice:{c:pc,t:pt},test:tt?{c:tc,t:tt,score:Math.round(tc/tt*100)}:null,stats:{n:st.n,avgSec:st.n?Math.round(st.ms/st.n/1000*10)/10:0,hints:st.hints,quickWrong:st.quickWrong,retryWin:st.retryWin,finalWrong:st.finalWrong,idle:S.idle||0}};}
+function check2(it,v){if(v===undefined)return false;if(Array.isArray(it.a))return Array.isArray(v)&&it.a.every((x,k)=>Number(x)===Number(v[k]));if(it.kind==='num')return Number(v)===Number(it.a);return String(v)===String(it.a);}
+function saveQuit(S){const data=collect(S);if(!data.stats.n)return;const L=Store.S.learners[S.L.id];if(!L)return;const p=S.plan;const rec=Object.assign({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),learnerId:L.id,track:L.track,week:p.week,day:p.day,month:p.month,kind:'quit',date:today(),ts:Date.now(),sec:Math.round((Date.now()-S.start)/1000),mode:S.mode,topic:S.title,progress:`${S.bi}/${S.blocks.length}`},data);Store.put('records',rec.id,rec);}
 function saveRecord(S,data){const L=Store.S.learners[S.L.id];if(!L)return null;const p=S.plan;
  const rec=Object.assign({month:p.month,id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),learnerId:L.id,track:L.track,no:L.done+1,week:p.week,day:p.day,kind:p.kind,date:today(),ts:Date.now(),sec:Math.round((Date.now()-S.start)/1000),mode:S.mode,trace:S.trace||0,topic:topicOf(L,p.week)},data);
- Store.put('records',rec.id,rec);const L2=Object.assign({},L,{done:L.done+1,updatedAt:Date.now()});Store.put('learners',L.id,L2);return rec;}
+ if(S.free){rec.kind='practice';rec.topic=S.title.replace('🔁 다시 풀기 · ','');}
+ Store.put('records',rec.id,rec);const nd=S.free?L.done:L.done+1;const np=plan({done:nd,startWeek:L.startWeek});let cur=null;try{if(L.track==='kor2'){const {u}=unitAt('kor2',np.week);cur={week:np.week,unit:uLabel(u),read:u?u.read:'story',grade:u?u.sem:'3학년'};}else cur={week:np.week,unit:topicOf(L,np.week)};}catch(e){}
+ const L2=Object.assign({},L,{done:nd,cur,updatedAt:Date.now()});Store.put('learners',L.id,L2);return rec;}
 function blockSummary(el){const S=App.sess;clearInterval(timerInt);const data=collect(S);data.gold=!!data.test;data.sticker=pickSticker(S.L,data.gold);const rec=saveRecord(S,data);
  const acc=data.test?data.test.score:(data.practice.t?Math.round(data.practice.c/data.practice.t*100):100);const stars=acc>=90?3:acc>=70?2:1;
  const isTest=!!data.test;const min=Math.max(1,Math.round(rec.sec/60));
- el.innerHTML=`<div class="card sum"><div class="small">오늘의 ${data.gold?'평가 메달':'스티커'}</div><div class="stkbig peel ${data.gold?'gold':''}">${data.sticker}</div><div class="stars" aria-label="별 ${stars}개">${'⭐'.repeat(stars)}<span style="opacity:.25">${'⭐'.repeat(3-stars)}</span></div><h2>${esc(S.L.name.split(' ')[0])}, ${stars===3?'정말 잘했어요!':stars===2?'잘했어요!':'끝까지 해냈어요!'}</h2>
+ Snd.fx('win');const lv=buddyLevel(S.L);
+ el.innerHTML=`<div class="card sum"><div class="sumb">${buddySVG(buddyOf(S.L),'wow',lv)}<span>${BUDDY[buddyOf(S.L)].name} Lv.${lv}${lv<3?` · 스티커 ${lv===1?10:30}장이면 레벨 업!`:''}</span></div><div class="small">오늘의 ${data.gold?'평가 메달':'스티커'}</div><div class="stkbig peel ${data.gold?'gold':''}">${data.sticker}</div><div class="stars" aria-label="별 ${stars}개">${'⭐'.repeat(stars)}<span style="opacity:.25">${'⭐'.repeat(3-stars)}</span></div><h2>${esc(S.L.name.split(' ')[0])}, ${stars===3?'정말 잘했어요!':stars===2?'잘했어요!':'끝까지 해냈어요!'}</h2>
  <div class="stat">${isTest?`<div><span class="small">평가 점수</span><b>${data.test.score}점</b></div>`:''}<div><span class="small">${isTest?'몸풀기':'연습'} 정답률 (첫 시도)</span><b>${data.practice.t?Math.round(data.practice.c/data.practice.t*100)+'%':'-'}</b></div><div><span class="small">공부 시간</span><b>${min}분</b></div>${S.trace?`<div><span class="small">따라 쓴 글자</span><b>${S.trace}개</b></div>`:''}</div>
  ${isTest&&data.test.score<70?'<p class="hintbox">이번 평가에서 약했던 부분은 다음 주 워밍업에 자동으로 다시 나와요.</p>':''}
  <div class="row"><button class="btn" id="home">스티커 붙이러 가기</button><button class="btn ghost" id="rep">기록 보기</button></div></div>`;
@@ -1238,7 +1262,7 @@ function lvTag(a){if(a===null)return '';return a>=90?'<span class="lv" style="ba
 function barH(a,c){return `<div class="bar"><i style="width:${a}%;background:${c||(a>=75?'var(--gr)':a>=60?'var(--yl)':'var(--rd)')}"></i></div>`;}
 function viewReport(el){const Ls=Object.values(Store.S.learners).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));if(!Ls.length){el.innerHTML='<div class="card empty"><div class="big">📊</div><p>학습자를 등록하고 공부를 시작하면 기록이 쌓여요.</p></div>';return;}
  if(!App.lid||!Store.S.learners[App.lid])App.lid=Ls[0].id;const L=Store.S.learners[App.lid],T=TRACK[L.track],p=plan(L);const rs=recsOf(L.id);
- const tot=rs.length,mins=Math.round(rs.reduce((a,r)=>a+(r.sec||0),0)/60);const pc=rs.reduce((a,r)=>a+(r.practice?r.practice.c:0),0),pt=rs.reduce((a,r)=>a+(r.practice?r.practice.t:0),0);
+ const rsAll=rs;const tot=rs.filter(isMain).length,mins=Math.round(rs.reduce((a,r)=>a+(r.sec||0),0)/60);const pc=rs.reduce((a,r)=>a+(r.practice?r.practice.c:0),0),pt=rs.reduce((a,r)=>a+(r.practice?r.practice.t:0),0);
  const tests=rs.filter(r=>r.test);const wTests=tests.filter(r=>r.kind==='week'),mTests=tests.filter(r=>r.kind==='month');
  // 주간 그래프
  const chart=tests.length?`<svg viewBox="0 0 ${Math.max(320,tests.length*56+40)} 210" style="width:100%;max-width:${Math.max(320,tests.length*56+40)}px">${[0,50,70,100].map(y=>`<line x1="30" x2="${tests.length*56+30}" y1="${180-y*1.6}" y2="${180-y*1.6}" stroke="${y===70?'#FFC53D':'#eee'}" ${y===70?'stroke-dasharray="5 4"':''}/><text x="4" y="${184-y*1.6}" font-size="11" fill="#999">${y}</text>`).join('')}
@@ -1248,14 +1272,16 @@ function viewReport(el){const Ls=Object.values(Store.S.learners).sort((a,b)=>(a.
  const monthH=Object.keys(months).sort((a,b)=>b-a).map(m=>{const g=months[m];const A=skillAgg(g);const sk=Object.entries(A).filter(([s,[c,t]])=>t>=3).map(([s,[c,t]])=>[s,Math.round(c/t*100)]).sort((a,b)=>b[1]-a[1]);
   const mt=g.find(r=>r.kind==='month');const wt=g.filter(r=>r.kind==='week'&&r.test);const gp=g.reduce((a,r)=>a+(r.practice?r.practice.c:0),0),gt=g.reduce((a,r)=>a+(r.practice?r.practice.t:0),0);
   const weeks=uniq(g.map(r=>r.week)).sort((a,b)=>a-b);
-  return `<div class="card mcard"><h3>${m}월차 <span class="small">(${weeks[0]}~${weeks[weeks.length-1]}주차 · ${g[0].date} ~ ${g[g.length-1].date})</span></h3><div class="kpis"><div class="kpi"><span>학습 횟수</span><b>${g.length}회</b></div><div class="kpi"><span>공부 시간</span><b>${Math.round(g.reduce((a,r)=>a+(r.sec||0),0)/60)}분</b></div><div class="kpi"><span>연습 정답률</span><b>${gt?Math.round(gp/gt*100)+'%':'-'}</b></div><div class="kpi"><span>주간 평가 평균</span><b>${wt.length?Math.round(wt.reduce((a,r)=>a+r.test.score,0)/wt.length)+'점':'-'}</b></div><div class="kpi"><span>월간 평가</span><b style="color:var(--pu)">${mt?mt.test.score+'점':'예정'}</b></div></div>
+  return `<div class="card mcard"><h3>${m}월차 <span class="small">(${weeks[0]}~${weeks[weeks.length-1]}주차 · ${g[0].date} ~ ${g[g.length-1].date})</span></h3><div class="kpis"><div class="kpi"><span>학습 횟수</span><b>${g.filter(isMain).length}회</b></div><div class="kpi"><span>공부 시간</span><b>${Math.round(g.reduce((a,r)=>a+(r.sec||0),0)/60)}분</b></div><div class="kpi"><span>연습 정답률</span><b>${gt?Math.round(gp/gt*100)+'%':'-'}</b></div><div class="kpi"><span>주간 평가 평균</span><b>${wt.length?Math.round(wt.reduce((a,r)=>a+r.test.score,0)/wt.length)+'점':'-'}</b></div><div class="kpi"><span>월간 평가</span><b style="color:var(--pu)">${mt?mt.test.score+'점':'예정'}</b></div></div>
   <p style="margin:12px 0 0">💪 <b>잘하는 부분</b>: ${sk.filter(x=>x[1]>=85).slice(0,3).map(x=>`${SKILL_NAME[x[0]]||x[0]}(${x[1]}%)`).join(', ')||'-'}<br>🔁 <b>더 연습할 부분</b>: ${sk.filter(x=>x[1]<75).reverse().slice(0,3).map(x=>`${SKILL_NAME[x[0]]||x[0]}(${x[1]}%)`).join(', ')||'없음 👍'}</p></div>`;}).join('');
  const A=skillAgg(rs);const skillRows=Object.entries(A).sort((a,b)=>a[0].localeCompare(b[0])).map(([s,[c,t]])=>{const a=Math.round(c/t*100);return `<tr><td>${SKILL_NAME[s]||s}</td><td>${c}/${t}</td><td style="width:35%">${barH(a)}</td><td>${a}%</td><td>${lvTag(a)}</td></tr>`;}).join('');
  const wrongCnt={};if(L.track==='hangul')rs.forEach(r=>(r.wrong||[]).forEach(w=>{if(!w.startsWith('h_')&&!w.startsWith('k_'))wrongCnt[w]=(wrongCnt[w]||0)+1;}));const topWrong=Object.entries(wrongCnt).sort((a,b)=>b[1]-a[1]).slice(0,12);
- const recent=rs.slice().reverse().slice(0,20).map(r=>`<tr><td>${r.date}</td><td>${r.week}주 ${r.day}회</td><td>${r.kind==='study'?'학습':r.kind==='week'?'📝 주간 평가':'🏆 월간 평가'}${r.mode==='paper'?' · 종이':''}</td><td>${esc(r.topic||'')}</td><td>${r.test?`<b>${r.test.score}점</b>`:r.practice&&r.practice.t?Math.round(r.practice.c/r.practice.t*100)+'%':'-'}</td><td>${Math.round((r.sec||0)/60)}분</td></tr>`).join('');
+ const recent=rs.slice().reverse().slice(0,20).map(r=>`<tr><td>${r.date}</td><td>${r.kind==='practice'?'-':r.week+'주 '+r.day+'회'}</td><td>${{study:'학습',week:'📝 주간 평가',month:'🏆 월간 평가',practice:'🔁 다시 풀기',quit:'⏸ 중간에 멈춤'}[r.kind]||'학습'}${r.mode==='paper'?' · 종이':''}${r.stats?` · 문제당 ${r.stats.avgSec}초`:''}</td><td>${esc(r.topic||'')}</td><td>${r.test?`<b>${r.test.score}점</b>`:r.practice&&r.practice.t?Math.round(r.practice.c/r.practice.t*100)+'%':'-'}</td><td>${Math.round((r.sec||0)/60)}분</td></tr>`).join('');
  el.innerHTML=`<div class="lsel">${Ls.map(x=>`<button data-l="${x.id}" class="${x.id===L.id?'on':''}">${x.emoji||TRACK[x.track].av} ${esc(x.name)}</button>`).join('')}</div>
  <div class="sec">${esc(L.name)} · ${T.full||T.name} <span class="small">지금 ${p.week}주차 ${p.day}회 · ${esc(topicOf(L,p.week))}</span></div>
  <div class="kpis"><div class="kpi"><span>총 학습</span><b>${tot}회</b></div><div class="kpi"><span>총 공부 시간</span><b>${Math.floor(mins/60)}시간 ${mins%60}분</b></div><div class="kpi"><span>연습 정답률</span><b>${pt?Math.round(pc/pt*100)+'%':'-'}</b></div><div class="kpi"><span>최근 주간 평가</span><b>${wTests.length?wTests[wTests.length-1].test.score+'점':'-'}</b></div><div class="kpi"><span>최근 월간 평가</span><b>${mTests.length?mTests[mTests.length-1].test.score+'점':'-'}</b></div></div>
+ ${Store.content&&Store.content.some(c=>c.status==='pending')?`<div class="card" style="margin-top:14px;border-color:#FFC9C3"><div class="row"><b>📝 새 지문 ${Store.content.filter(c=>c.status==='pending').length}편이 검토를 기다려요</b><div class="sp"></div><button class="btn sm" id="gorev">검토하기</button></div></div>`:''}
+ ${attitudeHTML(L,rs)}
  <div class="sec">🎖️ 스티커 모음</div><div class="card"><div class="stkgrid">${rs.filter(r=>r.sticker).map(r=>`<span class="${r.gold?'gold':''}" title="${r.date} ${r.week}주 ${r.day}회">${r.sticker}</span>`).join('')}${Array.from({length:Math.max(0,5-rs.filter(r=>r.sticker).length%5||0)},()=>'<span class="blank"></span>').join('')}</div><p class="small" style="margin-bottom:0">학습을 마칠 때마다 스티커 1장, 평가를 마치면 보라색 테두리 메달을 받아요.</p></div>
  <div class="sec">📈 주별·월별 평가 점수</div><div class="card" style="overflow:auto">${chart}</div>
  <div class="sec">🗓️ 월간 리포트</div><div class="grid">${monthH||'<div class="card muted">기록이 쌓이면 4주 단위로 정리돼요.</div>'}</div>
@@ -1263,7 +1289,7 @@ function viewReport(el){const Ls=Object.values(Store.S.learners).sort((a,b)=>(a.
  ${topWrong.length?`<div class="sec">🔤 자주 틀린 글자·낱말</div><div class="card"><div class="row">${topWrong.map(([w,n])=>`<span class="chip" style="font-size:20px;font-family:Jua;color:var(--ink)">${esc(w)} <small>${n}</small></span>`).join('')}</div><p class="small">이 글자들은 그림 카드나 종이에 크게 써서 하루 2~3번 읽어 보면 좋아요.</p></div>`:''}
  <div class="sec">📝 보호자 메모</div><div class="card"><textarea id="memo" rows="3" placeholder="예: 7단을 자주 헷갈림, 받침 ㄹ 소리 연습 필요">${esc(L.memo||'')}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" id="savememo">메모 저장</button><div class="sp"></div><button class="btn ghost sm" id="copy">📋 리포트 텍스트 복사</button></div></div>
  <div class="sec">🕘 최근 학습 기록</div><div class="card" style="overflow:auto">${recent?`<table class="rt"><tr><th>날짜</th><th>회차</th><th>종류</th><th>주제</th><th>결과</th><th>시간</th></tr>${recent}</table>`:'<p class="muted">아직 기록이 없어요.</p>'}</div>`;
- el.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{App.lid=b.dataset.l;App.render();});
+ el.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{App.lid=b.dataset.l;App.render();});const gr=$('#gorev');if(gr)gr.onclick=()=>App.go('review');
  $('#savememo').onclick=()=>{const L2=Object.assign({},Store.S.learners[L.id],{memo:$('#memo').value,updatedAt:Date.now()});Store.put('learners',L.id,L2);toast('메모를 저장했어요');};
  $('#copy').onclick=()=>{const lines=[`[${L.name} · ${T.name}] ${p.week}주차 ${p.day}회 진행 중`,`총 ${tot}회 · ${mins}분 · 연습 정답률 ${pt?Math.round(pc/pt*100):0}%`,...tests.map(r=>`${r.kind==='month'?(r.month||Math.ceil(r.week/4))+'월차 월간':r.week+'주차 주간'} 평가: ${r.test.score}점 (${r.date})`),'영역별: '+Object.entries(A).map(([s,[c,t]])=>`${SKILL_NAME[s]||s} ${Math.round(c/t*100)}%`).join(', ')];
   navigator.clipboard.writeText(lines.join('\n')).then(()=>toast('복사했어요')).catch(()=>toast('복사가 안 되는 환경이에요'));};}
@@ -1289,6 +1315,13 @@ function viewHelp(el){el.innerHTML=`<div class="grid"><div class="card"><h2 styl
  <li>매주 <b>5회차는 주간 평가</b>, 4주마다(4·8·12주…) 5회차는 <b>월간 평가</b>예요. 평가에서는 힌트와 즉시 정답이 나오지 않아요.</li>
  <li>평가에서 약했던 영역은 다음 회차 <b>워밍업에 자동으로 다시</b> 나와요.</li>
  <li><b>📊 기록·평가</b>에서 주별·월별 점수, 영역별 성취도, 자주 틀린 글자를 볼 수 있어요.</li></ol></div>
+ <div class="card"><h2 style="margin-top:0">✨ 새로 생긴 기능</h2><ul style="line-height:1.9;margin:0;padding-left:22px">
+ <li><b>공부 친구</b>: 설정⚙️에서 반짝이·몽실이·콩콩이·깡총이·삑삑이 중에 골라요. 스티커 10장이면 왕관, 30장이면 반짝이 장식이 생겨요.</li>
+ <li><b>음악</b>: 위쪽 🎵 버튼으로 켜고 꺼요. 앱이 직접 만드는 잔잔한 음악이고, 문제를 읽어 줄 때는 저절로 작아져요.</li>
+ <li><b>🔁 지난 단원</b>: 끝낸 단원의 새 문제를 더 풀 수 있어요. 진도는 그대로예요.</li>
+ <li><b>학습 태도와 성장</b>: 기록·평가에서 꾸준함·집중도·끈기·꼼꼼함과 주별 정답률·공부 시간 변화를 볼 수 있어요.</li>
+ <li><b>새 지문</b>: 매주 일요일 저녁 새 국어 지문이 만들어져요. 기록·평가 화면에서 검토하고 승인한 것만 아이에게 나와요.</li>
+ <li><b>보호자 확인</b>: 설정·기록·사용법에 들어갈 때 간단한 곱셈을 물어봐요. 한 번 통과하면 10분 동안은 다시 묻지 않아요.</li></ul></div>
  <div class="card"><h2 style="margin-top:0">✏️ 손으로 푸는 연습</h2><ul style="line-height:1.9;margin:0;padding-left:22px">
  <li><b>연습장</b>: 수학 문제 옆에 모눈 연습장이 있어요. 세로셈을 손가락이나 터치펜으로 직접 쓰게 해 주세요. <b>✏️ 세로셈 틀 보기</b>를 누르면 자리 맞추는 법이 나와요.</li>
  <li><b>📝 종이 학습지</b>: 홈에서 누르면 그 회차 문제가 학습지로 만들어져요. 인쇄용 파일을 받아 인쇄하고, 아이가 연필로 푼 뒤 <b>채점하기</b>에서 ⭕/❌만 누르면 기록·평가에 똑같이 반영돼요.</li>
@@ -1306,6 +1339,141 @@ function viewHelp(el){el.innerHTML=`<div class="grid"><div class="card"><h2 styl
  $('#rs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(o.app!=='hlab'||!o.learners)throw 0;const c=await modal(`<h2>백업을 불러올까요?</h2><p>학습자 ${Object.keys(o.learners).length}명, 기록 ${Object.keys(o.records||{}).length}개가 들어 있어요. 같은 학습자는 더 최근 기록으로 합쳐져요.</p>`,[{t:'취소',v:0,cls:'ghost'},{t:'불러오기',v:1}]);if(!c.v)return;
   for(const id in o.learners){const a=o.learners[id],b=Store.S.learners[id];if(!b||(a.updatedAt||0)>=(b.updatedAt||0))Store.put('learners',id,a);}for(const id in (o.records||{}))if(!Store.S.records[id])Store.put('records',id,o.records[id]);toast('백업을 불러왔어요');App.go('home');}catch(err){toast('우리집 공부방 백업 파일이 아니에요');}};}
 
+
+// ================= 공부 친구 캐릭터 (원작) =================
+function _face(cx,cy,m,ink='#1F2A44'){const ey=m==='wow'?7:6;let s=`<ellipse cx="${cx-12}" cy="${cy}" rx="5" ry="${ey}" fill="${ink}"/><ellipse cx="${cx+12}" cy="${cy}" rx="5" ry="${ey}" fill="${ink}"/><circle cx="${cx-10.5}" cy="${cy-2.5}" r="1.8" fill="#fff"/><circle cx="${cx+13.5}" cy="${cy-2.5}" r="1.8" fill="#fff"/>`;
+ s+=`<ellipse cx="${cx-21}" cy="${cy+11}" rx="6" ry="4" fill="#FF8A7A" opacity=".65"/><ellipse cx="${cx+21}" cy="${cy+11}" rx="6" ry="4" fill="#FF8A7A" opacity=".65"/>`;
+ s+=m==='wow'?`<ellipse cx="${cx}" cy="${cy+15}" rx="6" ry="7" fill="${ink}"/>`:m==='think'?`<path d="M${cx-7} ${cy+15} Q${cx} ${cy+12} ${cx+7} ${cy+16}" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`:`<path d="M${cx-9} ${cy+11} Q${cx} ${cy+21} ${cx+9} ${cy+11}" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`;return s;}
+const BUDDY={
+ star:{name:'반짝이',desc:'별에서 온 친구',body:m=>`<path d="M60 10 L74.5 41.5 L110 45 L83 68.5 L91 103 L60 85 L29 103 L37 68.5 L10 45 L45.5 41.5 Z" fill="#FFC94A" stroke="#E9A800" stroke-width="7" stroke-linejoin="round"/>${_face(60,60,m)}`},
+ cloud:{name:'몽실이',desc:'하늘을 떠다니는 구름',body:m=>`<path d="M30 92 Q12 92 12 75 Q12 58 30 58 Q31 36 53 36 Q64 22 80 33 Q104 31 106 55 Q118 61 113 78 Q109 92 94 92 Z" fill="#fff" stroke="#7FB2FF" stroke-width="6" stroke-linejoin="round"/>${_face(62,66,m)}`},
+ dino:{name:'콩콩이',desc:'씩씩한 아기 공룡',body:m=>`<path d="M40 26 L48 12 L56 26 Z M56 22 L65 8 L73 22 Z M72 24 L82 12 L87 28 Z" fill="#FF9F43" stroke="#E07B1A" stroke-width="3" stroke-linejoin="round"/><ellipse cx="62" cy="66" rx="42" ry="42" fill="#6CCB8B" stroke="#3FA66A" stroke-width="6"/><ellipse cx="62" cy="86" rx="24" ry="16" fill="#C9F0D6"/>${_face(62,58,m)}`},
+ bunny:{name:'깡총이',desc:'귀가 쫑긋한 토끼',body:m=>`<ellipse cx="44" cy="30" rx="11" ry="25" fill="#FFE1EA" stroke="#F29BB5" stroke-width="5"/><ellipse cx="76" cy="30" rx="11" ry="25" fill="#FFE1EA" stroke="#F29BB5" stroke-width="5"/><ellipse cx="44" cy="32" rx="4" ry="15" fill="#FFB3C8"/><ellipse cx="76" cy="32" rx="4" ry="15" fill="#FFB3C8"/><circle cx="60" cy="74" r="38" fill="#FFE1EA" stroke="#F29BB5" stroke-width="6"/>${_face(60,72,m)}`},
+ robot:{name:'삑삑이',desc:'계산을 좋아하는 로봇',body:m=>`<line x1="60" y1="30" x2="60" y2="14" stroke="#7D8FA6" stroke-width="5"/><circle cx="60" cy="12" r="7" fill="#FF6B5E"/><rect x="18" y="30" width="84" height="76" rx="22" fill="#D5E3F1" stroke="#7D8FA6" stroke-width="6"/><rect x="30" y="44" width="60" height="44" rx="14" fill="#fff"/>${_face(60,62,m)}<rect x="10" y="58" width="9" height="20" rx="4" fill="#7D8FA6"/><rect x="101" y="58" width="9" height="20" rx="4" fill="#7D8FA6"/>`}};
+function buddyLevel(L){const n=Object.values(Store.S.records).filter(r=>r.learnerId===L.id&&r.sticker).length;return n>=30?3:n>=10?2:1;}
+function buddySVG(key,mood='smile',lv=1){const B=BUDDY[key]||BUDDY.star;let extra='';
+ if(lv>=2)extra+=`<path d="M44 ${key==='bunny'?44:key==='dino'?20:6} l6 -9 l10 7 l10 -7 l6 9 z" fill="#FFC94A" stroke="#E9A800" stroke-width="3" stroke-linejoin="round" transform="translate(0,${key==='bunny'?-8:0})"/>`;
+ if(lv>=3)extra+=`<path d="M10 20 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 l7 -3z M108 88 l2.5 6 l6 2.5 l-6 2.5 l-2.5 6 l-2.5 -6 l-6 -2.5 l6 -2.5z" fill="#FFC94A"/>`;
+ return `<svg viewBox="0 0 120 120" aria-hidden="true">${B.body(mood)}${extra}</svg>`;}
+function buddyOf(L){return (L&&L.buddy)||'star';}
+function buddyNow(m){const L=App.sess&&App.sess.L;return L?buddySVG(buddyOf(L),m,buddyLevel(L)):MASCOT(m);}
+const BUDDY_LINES=[t=>`오늘은 "${t}" 같이 해 볼까?`,t=>'천천히, 끝까지 해 보자!',t=>'어제보다 한 걸음 더!',t=>'틀려도 괜찮아, 다시 하면 돼!',t=>'스티커 하나 더 모으러 가자!'];
+
+// ================= 음악·효과음 (직접 합성, 저작권 걱정 없음) =================
+const Snd={ctx:null,master:null,music:null,on:true,musicOn:false,timer:null,step:0,
+ load(){try{this.on=localStorage.getItem('hlab_sfx')!=='0';this.musicOn=localStorage.getItem('hlab_music')==='1';}catch(e){}},
+ save(){try{localStorage.setItem('hlab_sfx',this.on?'1':'0');localStorage.setItem('hlab_music',this.musicOn?'1':'0');}catch(e){}},
+ ensure(){if(this.ctx)return true;try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;this.ctx=new AC();this.master=this.ctx.createGain();this.master.gain.value=0.9;this.master.connect(this.ctx.destination);this.music=this.ctx.createGain();this.music.gain.value=0.05;this.music.connect(this.master);return true;}catch(e){return false;}},
+ tone(f,d,{type='sine',vol=0.18,at=0,dest}={}){if(!this.ensure())return;const t=this.ctx.currentTime+at;const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(dest||this.master);o.start(t);o.stop(t+d+0.05);},
+ fx(kind){if(!this.on)return;if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
+  if(kind==='ok'){this.tone(784,.14,{type:'triangle'});this.tone(1175,.22,{type:'triangle',at:.09});}
+  else if(kind==='no'){this.tone(330,.16,{vol:.12});this.tone(262,.22,{vol:.12,at:.12});}
+  else if(kind==='tap')this.tone(660,.06,{vol:.06,type:'triangle'});
+  else if(kind==='win'){[523,659,784,1046,1318].forEach((f,i)=>this.tone(f,.28,{type:'triangle',at:i*.09,vol:.16}));}},
+ // 잔잔한 오음음계 음악: 4마디 진행 위에 조금씩 바뀌는 멜로디
+ startMusic(){if(!this.musicOn||!this.ensure()||this.timer)return;if(this.ctx.state==='suspended')this.ctx.resume();
+  const scale=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];const chords=[[130.8,196,261.6],[110,164.8,220],[87.3,130.8,174.6],[98,146.8,196]];let pos=3;
+  const beat=0.5;let next=this.ctx.currentTime+0.1;
+  this.timer=setInterval(()=>{while(next<this.ctx.currentTime+0.6){const s=this.step++;const bar=Math.floor(s/8)%4;
+    if(s%8===0)chords[bar].forEach(f=>this.tone(f,beat*7.5,{type:'sine',vol:.35,at:next-this.ctx.currentTime,dest:this.music}));
+    if(Math.random()<0.72){pos=Math.max(0,Math.min(scale.length-1,pos+pick([-2,-1,-1,0,1,1,2])));this.tone(scale[pos],beat*1.6,{type:'triangle',vol:.5,at:next-this.ctx.currentTime,dest:this.music});}
+    next+=beat;}},200);},
+ stopMusic(){clearInterval(this.timer);this.timer=null;},
+ duck(sec){if(!this.ctx||!this.music)return;const g=this.music.gain,t=this.ctx.currentTime;g.cancelScheduledValues(t);g.setTargetAtTime(0.008,t,0.08);g.setTargetAtTime(0.05,t+sec,0.4);},
+ toggleMusic(){this.musicOn=!this.musicOn;this.save();if(this.musicOn)this.startMusic();else this.stopMusic();App.status&&App.status();soundBtns();}};
+Snd.load();
+const _say=Voice.say.bind(Voice);Voice.say=function(t){if(t)Snd.duck(Math.min(6,1.2+String(t).length*0.12));_say(t);};
+function soundBtns(){document.querySelectorAll('[data-music]').forEach(b=>{b.textContent=Snd.musicOn?'🎵 음악 켜짐':'🔇 음악 꺼짐';b.setAttribute('aria-pressed',Snd.musicOn);});}
+document.addEventListener('pointerdown',()=>{if(Snd.musicOn&&!Snd.timer)Snd.startMusic();Snd.lastAct=Date.now();},{capture:true});
+
+// ================= 보호자 확인 =================
+let gateUntil=0;
+async function gate(fn){if(Date.now()<gateUntil)return fn();const a=R(12,19),b=R(11,19);
+ const r=await modal(`<h2>보호자 확인</h2><p>보호자만 들어갈 수 있는 곳이에요. 계산해서 답을 입력해 주세요.</p><div class="field"><label>${a} × ${b} = ?</label><input type="number" name="ans" inputmode="numeric"></div>`,[{t:'취소',v:0,cls:'ghost'},{t:'확인',v:1}]);
+ if(!r.v)return;if(parseInt(r.data.ans)===a*b){gateUntil=Date.now()+10*60000;fn();}else toast('답이 맞지 않아요');}
+
+// ================= 승인된 새 지문 반영 =================
+Store.content=[];
+function injectContent(items){items.forEach(c=>{const d=c.data||{};if(c.status!=='approved'||!d.t||!d.qs)return;
+ const bank=d.kind==='poem'?KPOEM:d.kind==='info'?KINFO:KSTORY;if(bank.some(x=>x.t===d.t))return;
+ if(d.kind==='poem'&&Array.isArray(d.lines))bank.push({t:d.t,lines:d.lines,qs:d.qs,_db:c.id});else if(Array.isArray(d.s))bank.push({t:d.t,s:d.s,qs:d.qs,_db:c.id});
+ (d.dict||[]).forEach(s=>{if(!KDICT.includes(s))KDICT.push(s);});});}
+
+// ================= 자유 연습: 지난 단원 다시 풀기 =================
+function freeOptions(L){const p=plan(L);if(L.track==='hangul'){const out=[];for(let w=1;w<=Math.min(p.week,HW.length+1);w++)out.push({key:w,label:`${w}주차 · ${hWeek(w).t}`,done:w<p.week,cur:w===p.week});return out;}
+ return unitStarts(L.track).map((x,i)=>({key:i,label:uLabel(x.u),done:x.week+(x.u.w||2)-1<p.week,cur:x.week<=p.week&&p.week<x.week+(x.u.w||2)})).filter(o=>o.done||o.cur);}
+async function chooseFree(id){const L=Store.S.learners[id];const opts=freeOptions(L);
+ const html=`<h2>🔁 지난 단원 다시 풀기</h2><p class="muted" style="margin-top:0">끝낸 단원의 새 문제를 풀어요. 진도는 그대로이고, 기록은 "연습"으로 남아요.</p><div class="freelist">${opts.slice().reverse().map(o=>`<button data-free="${o.key}" class="${o.cur?'cur':''}"><span>${o.done?'✅':'📍'}</span>${esc(o.label)}</button>`).join('')}</div>`;
+ const m=$('#modal');const p=modal(html,[{t:'닫기',v:0,cls:'ghost'}]);m.querySelectorAll('[data-free]').forEach(b=>b.onclick=()=>{m.classList.add('hidden');startFree(id,+b.dataset.free);});await p;}
+function buildFree(L,key){if(L.track==='hangul'){const W=hWeek(key),K=hKnown(key,5);return {title:`🔁 다시 풀기 · ${key}주차 ${W.t}`,blocks:[
+  {type:'learn',title:'글자 다시 보기',mins:5,cards:W.chunks.flat().flatMap(s=>learnCards(s,K)).slice(0,8),K},
+  {type:'quiz',title:'글자 놀이',mins:15,mode:'practice',items:hItems(W,K,12)},
+  {type:'trace',title:'따라 쓰기',mins:8,letters:traceLetters(W.chunks.flat(),K).slice(0,4)},
+  {type:'quiz',title:'수 놀이',mins:8,mode:'practice',items:gen(shuffle(W.math),2,6)},{type:'summary',title:'정리'}]};}
+ const u=SEQ[L.track]()[key];
+ if(L.track==='kor2')return {title:`🔁 다시 풀기 · ${uLabel(u)}`,blocks:[
+  {type:'concept',title:'다시 보기',mins:5,cards:u.c},
+  {type:'quiz',title:'받아쓰기',mins:8,mode:'practice',items:shuffle(KDICT).slice(0,3).map(s=>({skill:'g_dict',kind:'dict',q:'잘 듣고 받아써요',say:s,a:s,tag:s}))},
+  {type:'quiz',title:'단원 문제',mins:15,mode:'practice',items:gen(shuffle(u.skills),i=>[1,2,3][i%3],12)},
+  {type:'quiz',title:'글 읽기',mins:10,mode:'practice',items:passageItems(u.read,3)},{type:'summary',title:'정리'}]};
+ return {title:`🔁 다시 풀기 · ${uLabel(u)}`,blocks:[
+  {type:'concept',title:'다시 보기',mins:5,cards:u.c},
+  {type:'quiz',title:'연습 문제',mins:20,mode:'practice',items:gen(shuffle(u.calc),i=>[1,2,3][i%3],15)},
+  {type:'quiz',title:'응용 문제',mins:10,mode:'practice',items:gen(shuffle(u.word),i=>[2,3][i%2],5)},{type:'summary',title:'정리'}]};}
+function startFree(id,key){const L=Store.S.learners[id];const S=buildFree(L,key);Object.assign(S,{L,plan:plan(L),mode:'tablet',start:Date.now(),bi:0,res:[],trace:0,free:true,idle:0});App.sess=S;App.view='session';runSession();}
+
+// ================= 학습 태도·향상도 =================
+const isMain=r=>!r.kind||r.kind==='study'||r.kind==='week'||r.kind==='month';
+function recAcc(r){const t=(r.practice?r.practice.t:0)+(r.test?r.test.t:0),c=(r.practice?r.practice.c:0)+(r.test?r.test.c:0);return t?[c,t]:null;}
+function attitude(rs){const st=rs.filter(r=>r.stats);const n=st.reduce((a,r)=>a+r.stats.n,0);
+ const quits=rs.filter(r=>r.kind==='quit').length,done=rs.filter(r=>r.kind!=='quit').length;
+ const sec=st.reduce((a,r)=>a+(r.sec||0),0),idle=st.reduce((a,r)=>a+(r.stats.idle||0),0);
+ const hints=st.reduce((a,r)=>a+(r.stats.hints||0),0),qw=st.reduce((a,r)=>a+(r.stats.quickWrong||0),0);
+ const rw=st.reduce((a,r)=>a+(r.stats.retryWin||0),0),fw=st.reduce((a,r)=>a+(r.stats.finalWrong||0),0);
+ const days=new Set(rs.map(r=>r.date));const weeks=new Set(rs.map(r=>weekKey(r.date)));
+ return {n,focus:sec?1-Math.min(1,idle/sec):null,grit:done+quits?done/(done+quits):null,careful:n?1-qw/n:null,self:n?1-hints/n:null,retry:rw+fw?rw/(rw+fw):null,steady:weeks.size?Math.min(1,days.size/weeks.size/5):null,daysPerWeek:weeks.size?days.size/weeks.size:0,avgSec:n?st.reduce((a,r)=>a+r.stats.avgSec*r.stats.n,0)/n:null};}
+function attitudeHTML(L,rs){if(!rs.length)return '';const now=new Date();const cut=d=>{const x=new Date(now);x.setDate(x.getDate()-d);return fmtD(x);};
+ const recent=rs.filter(r=>r.date>=cut(28)),prev=rs.filter(r=>r.date<cut(28)&&r.date>=cut(56));const A=attitude(recent.length?recent:rs),B=prev.length?attitude(prev):null;
+ const rows=[['꾸준함','steady',`주 평균 ${A.daysPerWeek.toFixed(1)}일 공부 (목표 5일)`],['집중도','focus','멍하니 멈춘 시간이 적을수록 높아요'],['끈기','grit','시작한 회차를 끝까지 마친 비율'],['꼼꼼함','careful','3초 안에 급하게 답해서 틀린 일이 적을수록 높아요'],['스스로 해결','self','힌트 없이 푼 비율'],['다시 도전','retry','틀린 뒤 다시 생각해서 맞힌 비율']];
+ const bar=(v)=>v==null?'<span class="small">기록 쌓는 중</span>':barH(Math.round(v*100),v>=.8?'var(--mint)':v>=.6?'var(--sun)':'var(--coral)');
+ const diff=(k)=>{if(!B||A[k]==null||B[k]==null)return '';const d=Math.round((A[k]-B[k])*100);return d===0?'<span class="small">→ 그대로</span>':`<span class="small" style="color:${d>0?'#0E8A63':'#C02C31'}">${d>0?'▲':'▼'} ${Math.abs(d)}</span>`;};
+ // 주별 추세 (최근 8주, 달력 기준)
+ const wk=[];for(let i=7;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i*7);wk.push(weekKey(fmtD(d)));}
+ const W=wk.map(k=>{const g=rs.filter(r=>weekKey(r.date)===k);const acc=g.map(recAcc).filter(Boolean);const c=acc.reduce((a,x)=>a+x[0],0),t=acc.reduce((a,x)=>a+x[1],0);const st=g.filter(r=>r.stats);const n=st.reduce((a,r)=>a+r.stats.n,0);
+  return {k,min:Math.round(g.reduce((a,r)=>a+(r.sec||0),0)/60),acc:t?Math.round(c/t*100):null,spd:n?Math.round(st.reduce((a,r)=>a+r.stats.avgSec*r.stats.n,0)/n):null};});
+ const mx=Math.max(60,...W.map(w=>w.min));const X=i=>40+i*52,Y=v=>150-v/100*120;
+ let svg=`<svg viewBox="0 0 470 190" style="width:100%;max-width:620px">`;[0,50,100].forEach(v=>svg+=`<line x1="34" x2="452" y1="${Y(v)}" y2="${Y(v)}" stroke="#EDF2F9"/><text x="28" y="${Y(v)+4}" font-size="10" text-anchor="end" fill="#6B7690">${v}%</text>`);
+ W.forEach((w,i)=>{const h=w.min/mx*120;svg+=`<rect x="${X(i)-14}" y="${150-h}" width="28" height="${h}" rx="5" fill="#E6EEFF"/><text x="${X(i)}" y="${146-h}" font-size="10" text-anchor="middle" fill="#6B7690">${w.min?w.min+'분':''}</text><text x="${X(i)}" y="170" font-size="10" text-anchor="middle" fill="#6B7690">${+w.k.slice(5,7)}/${+w.k.slice(8)}</text>`;});
+ const pts=W.map((w,i)=>w.acc==null?null:[X(i),Y(w.acc)]).filter(Boolean);if(pts.length)svg+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#16B886" stroke-width="3"/>`+pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#16B886"/>`).join('');
+ svg+=`</svg><div class="small"><span style="color:#16B886">●</span> 정답률(첫 시도) <span style="color:#9FB6E8">■</span> 공부 시간 · 날짜는 그 주 월요일</div>`;
+ // 자동 코멘트
+ const notes=[];const half=W.slice(4),first=W.slice(0,4);const avg=(a,f)=>{const v=a.map(f).filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length:null;};
+ const a1=avg(first,w=>w.acc),a2=avg(half,w=>w.acc);if(a1!=null&&a2!=null){const d=Math.round(a2-a1);notes.push(d>=3?`정답률이 ${Math.round(a1)}% → ${Math.round(a2)}%로 <b>${d}%p 올랐어요.</b>`:d<=-3?`정답률이 ${Math.round(a1)}% → ${Math.round(a2)}%로 ${-d}%p 내려갔어요. 단원이 어려워졌는지 확인해 주세요.`:`정답률이 ${Math.round(a2)}% 안팎으로 안정적이에요.`);}
+ const s1=avg(first,w=>w.spd),s2=avg(half,w=>w.spd);if(s1&&s2){const d=Math.round(s1-s2);if(Math.abs(d)>=3)notes.push(d>0?`문제당 풀이 시간이 ${Math.round(s1)}초 → ${Math.round(s2)}초로 빨라졌어요.`:`문제당 풀이 시간이 ${Math.round(s1)}초 → ${Math.round(s2)}초로 늘었어요. 어려운 단원이거나 집중이 흐트러졌을 수 있어요.`);}
+ if(A.daysPerWeek&&A.daysPerWeek<3)notes.push('최근 공부한 날이 주 3일 미만이에요. 정해진 시간에 짧게라도 하는 습관을 만들어 주세요.');
+ if(A.careful!=null&&A.careful<0.85)notes.push('급하게 답해서 틀리는 일이 있어요. "다 읽고 답하기"를 함께 연습해 주세요.');
+ if(A.self!=null&&A.self<0.7)notes.push('힌트를 자주 봐요. 힌트 전에 연습장에 먼저 써 보게 해 주세요.');
+ if(A.grit!=null&&A.grit<0.85)notes.push('중간에 그만둔 회차가 있어요. 블록 사이 쉬는 시간을 넣어 주면 도움이 돼요.');
+ const strong=[],weak=[];const S1=skillAgg(rs.filter(r=>r.date<cut(14)&&r.date>=cut(42))),S2=skillAgg(rs.filter(r=>r.date>=cut(14)));
+ for(const k in S2){if(S1[k]&&S1[k][1]>=4&&S2[k][1]>=4){const d=Math.round((S2[k][0]/S2[k][1]-S1[k][0]/S1[k][1])*100);if(d>=10)strong.push(`${SKILL_NAME[k]||k} +${d}%p`);if(d<=-10)weak.push(`${SKILL_NAME[k]||k} ${d}%p`);}}
+ if(strong.length)notes.push(`최근 2주 많이 늘었어요: ${strong.slice(0,3).join(', ')}`);if(weak.length)notes.push(`최근 2주 주춤해요: ${weak.slice(0,3).join(', ')}`);
+ if(!notes.length)notes.push('기록이 더 쌓이면 변화를 알려 드릴게요. (2주 이상 필요)');
+ return `<div class="sec">🌱 학습 태도와 성장</div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+ <div class="card"><h3 style="margin:0 0 10px">학습 태도 <span class="small">최근 4주${B?' · ▲▼는 그 전 4주와 비교':''}</span></h3><table class="rt">${rows.map(([n,k,h])=>`<tr><td style="width:96px"><b>${n}</b></td><td>${bar(A[k])}</td><td style="width:48px">${A[k]==null?'':Math.round(A[k]*100)}</td><td style="width:60px">${diff(k)}</td></tr><tr><td></td><td colspan="3" class="small" style="padding-top:0">${h}</td></tr>`).join('')}</table></div>
+ <div class="card"><h3 style="margin:0 0 10px">주별 변화 <span class="small">최근 8주</span></h3>${svg}<ul style="margin:12px 0 0;padding-left:20px;line-height:1.7">${notes.map(x=>`<li>${x}</li>`).join('')}</ul>${A.avgSec?`<p class="small">문제당 평균 ${Math.round(A.avgSec)}초</p>`:''}</div></div>`;}
+
+// ================= 지문 검토 화면 =================
+function reviewHTML(c){const d=c.data||{};const body=d.kind==='poem'?`<div class="poem">${(d.lines||[]).map(esc).join('<br>')}</div>`:`<div>${(d.s||[]).map(esc).join(' ')}</div>`;
+ return `<div class="card" data-cid="${c.id}"><div class="row"><span class="trk" style="--c:var(--coral);--cbg:#FFEAE7">${esc(d.grade||'')} ${d.kind==='poem'?'시':d.kind==='info'?'설명글':'이야기'}</span><span class="small">${esc(c.unit||'')}</span></div>${psgHTML(d.t||'',body)}
+ <ol style="margin:0;padding-left:20px;line-height:1.8">${(d.qs||[]).map(q=>`<li>${esc(q[0])}<br><span class="small">보기: ${q[2].map(x=>x===q[1]?`<b style="color:#0E8A63">${esc(x)} ✓</b>`:esc(x)).join(' / ')}</span></li>`).join('')}</ol>
+ ${d.dict&&d.dict.length?`<p class="small">받아쓰기 문장: ${d.dict.map(esc).join(' / ')}</p>`:''}
+ <div class="row" style="margin-top:10px"><button class="btn gr sm" data-ok="${c.id}">✅ 아이에게 내기</button><button class="btn ghost sm" data-no="${c.id}">빼기</button></div></div>`;}
+function viewReview(el){const pend=Store.content.filter(c=>c.status==='pending');
+ el.innerHTML=`<div class="sec" style="margin-top:0">📝 새 지문 검토</div><p class="muted">매주 Claude가 아이 진도에 맞춰 새 지문을 만들어 둬요. 읽어 보고 괜찮은 것만 "아이에게 내기"를 눌러 주세요. 승인한 지문만 국어 "글 읽기"에 섞여 나와요.</p>
+ ${pend.length?`<div class="grid">${pend.map(reviewHTML).join('')}</div>`:'<div class="card empty"><div class="big">🗂️</div><p>검토할 새 지문이 없어요. 다음 자동 생성 때 다시 확인해 주세요.</p></div>'}
+ <p class="small">지금까지 승인한 지문: ${Store.content.filter(c=>c.status==='approved').length}편</p>`;
+ const act=async(id,st)=>{const c=Store.content.find(x=>String(x.id)===String(id));if(!c)return;try{const {error}=await Cloud.sb.from('hs_content').update({status:st}).eq('id',c.id);if(error)throw error;c.status=st;if(st==='approved')injectContent([c]);toast(st==='approved'?'아이 문제에 넣었어요':'뺐어요');viewReview(el);}catch(e){toast('저장하지 못했어요. 인터넷 연결을 확인해 주세요.');}};
+ el.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>act(b.dataset.ok,'approved'));el.querySelectorAll('[data-no]').forEach(b=>b.onclick=()=>act(b.dataset.no,'rejected'));}
 
 // ================= 시작 =================
 // ================= 이메일 로그인 + Supabase 저장 (독립 버전 전용) =================
@@ -1342,14 +1510,15 @@ async function afterLogin(){Store.mode='cloud';App.status();
   // 이 기기에만 있던 기록은 클라우드로 올리기
   for(const id in Store.S.learners){const a=Store.S.learners[id],b=L[id];if(!b||(a.updatedAt||0)>(b.updatedAt||0)){L[id]=a;Cloud.push({t:'hs_learners',id,data:a});}}
   for(const id in Store.S.records){if(!Rc[id]){Rc[id]=Store.S.records[id];Cloud.push({t:'hs_records',id,data:Rc[id]});}}
-  Store.S={learners:L,records:Rc};Store.saveLocal();}catch(e){console.warn(e);toast('인터넷 연결을 확인해 주세요. 이 기기에 저장된 기록으로 열었어요.');}
+  Store.S={learners:L,records:Rc};Store.saveLocal();
+  try{const {data:cs}=await Cloud.sb.from('hs_content').select('id,unit,status,data,owner').order('created_at',{ascending:true}).limit(1000);Store.content=cs||[];injectContent(Store.content);}catch(e){}}catch(e){console.warn(e);toast('인터넷 연결을 확인해 주세요. 이 기기에 저장된 기록으로 열었어요.');}
  if(App.view==='login')App.view='home';App.render();}
 Store.write=function(col,id,obj){if(Store.mode!=='cloud')return;Cloud.push({t:col==='learners'?'hs_learners':'hs_records',id,data:JSON.parse(JSON.stringify(obj))});};
 Store.del=function(col,id){delete this.S[col][id];this.saveLocal();if(Store.mode==='cloud')Cloud.push({t:col==='learners'?'hs_learners':'hs_records',id,op:'del'});};
 App.status=function(){const e=$('#st');if(!e)return;if(Store.mode!=='cloud'){e.textContent='📱 이 기기에 저장';return;}e.textContent=Cloud.queue.length?`⏳ 저장 대기 ${Cloud.queue.length}`:`☁️ ${Cloud.user?Cloud.user.email:''}`;};
 function viewLogin(el){let email='';try{email=localStorage.getItem('hlab_email')||'';}catch(e){}
  const app=$('#app');app.innerHTML=`<div class="wrap"><div class="login"><div class="mascot">${MASCOT('wow')}</div><h1>우리집 공부방</h1><p class="muted">보호자 이메일로 로그인해요. 아이들 기록이 어느 기기에서나 이어져요.</p>
- <div class="card" id="lb"><div class="field"><label>보호자 이메일</label><input type="email" id="em" value="${esc(email)}" placeholder="example@gmail.com" autocomplete="email" inputmode="email"></div><button class="btn" id="send" style="width:100%">로그인 코드 받기</button><p class="note" id="ln"></p></div>
+ <div class="card" id="lb"><div class="field"><label>보호자 이메일</label><input type="email" id="em" value="${esc(email)}" placeholder="example@gmail.com" autocomplete="email" inputmode="email"></div><button class="btn" id="send" style="width:100%">로그인 메일 받기</button><p class="note" id="ln"></p></div>
  <p class="small">로그인 없이 쓰려면 <a href="#" id="skip">이 기기에만 저장하기</a></p></div></div>`;
  const showCode=()=>{$('#lb').innerHTML=`<div style="text-align:center;font-size:44px">📬</div><p style="margin-top:0;text-align:center"><b>${esc(email)}</b>(으)로 로그인 메일을 보냈어요.<br><b>메일 속 "Sign in" 링크를 이 기기에서 눌러 주세요.</b><br><span class="small">링크를 누르면 이 앱이 열리면서 자동으로 로그인돼요. 메일이 안 보이면 스팸함도 확인해 주세요.</span></p>
   <details style="margin:10px 0"><summary class="small" style="cursor:pointer">메일에 숫자 코드가 있다면</summary><div class="field"><input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" style="font-family:Jua;font-size:30px;letter-spacing:8px;text-align:center"></div><button class="btn gr sm" id="ver" style="width:100%">코드로 로그인</button></details><p class="note" id="ln"></p><button class="btn ghost sm" id="back">이메일 다시 입력</button>`;
