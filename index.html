@@ -199,7 +199,7 @@ textarea,input[type=text],input[type=number],select{font-family:inherit;font-siz
 .login{max-width:440px;margin:6vh auto 0;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
 .login .mascot{width:110px;height:110px}.login h1{margin:0;font-size:34px}.login .card{width:100%;text-align:left}
 .login a{color:var(--blue)}
-input[type=email]{font-family:inherit;font-size:18px;padding:12px 14px;border-radius:14px;border:2px solid var(--line);width:100%;background:#fff;color:var(--ink)}
+input[type=email],input[type=password]{font-family:inherit;font-size:18px;padding:12px 14px;border-radius:14px;border:2px solid var(--line);width:100%;background:#fff;color:var(--ink)}
 
 .ava svg{width:52px;height:52px}
 .bubble{position:relative;background:var(--cbg);border-radius:16px;padding:10px 14px;font-size:15px;font-weight:700;color:var(--ink)}
@@ -248,6 +248,9 @@ code.ntfyt{background:#EEF4FF;padding:3px 8px;border-radius:8px;font-size:16px;u
 .dread{text-align:center;padding:40px 20px}.dnum{font-family:Jua,sans-serif;font-size:120px;line-height:1;margin-top:20px;color:var(--blue)}.dnum small{font-size:40px;margin-left:6px;color:var(--ink)}
 .dglist{display:grid;gap:8px}.dglist button{display:flex;gap:12px;align-items:center;text-align:left;border:2px solid #DCE3F2;background:#fff;border-radius:14px;padding:10px 14px;font:inherit;font-size:18px;cursor:pointer}
 .dglist button span{flex:1}.dglist button.no{border-color:var(--coral);background:#FFF1EF}.dglist i{font-style:normal;font-size:22px}
+.ltabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#F1F5FB;border-radius:14px;padding:5px;margin-bottom:14px}
+.ltabs button{border:0;background:transparent;border-radius:10px;padding:10px;font:inherit;font-size:16px;cursor:pointer;color:var(--mute)}
+.ltabs button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 2px 6px rgba(31,42,68,.08)}
 </style></head><body><div id="app"></div><div id="modal" class="modal hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.STANDALONE=true;
@@ -1765,7 +1768,7 @@ const Cloud={sb:null,user:null,queue:[],
   this.busy=false;App.status();}};
 // 저장소를 Supabase로 연결
 Store.connect=async function(){if(!Cloud.init()){this.mode='local';App.status();return;}
- Cloud.sb.auth.onAuthStateChange((ev,ses)=>{if(ev==='SIGNED_IN'&&ses&&!Cloud.user){Cloud.user=ses.user;afterLogin();}});
+ Cloud.sb.auth.onAuthStateChange((ev,ses)=>{if(ev==='SIGNED_IN'&&ses&&!Cloud.user){Cloud.user=ses.user;setTimeout(()=>afterLogin(),0);}});
  let u=null;try{u=await Cloud.session();}catch(e){}
  if(!u){let lo=false;try{lo=!!localStorage.getItem('hlab_local_only');}catch(e){}if(lo){this.mode='local';App.status();return;}App.view='login';App.render();return;}
  await afterLogin();};
@@ -1781,26 +1784,37 @@ async function afterLogin(){Store.mode='cloud';App.status();
 Store.write=function(col,id,obj){if(Store.mode!=='cloud')return;Cloud.push({t:col==='learners'?'hs_learners':'hs_records',id,data:JSON.parse(JSON.stringify(obj))});};
 Store.del=function(col,id){delete this.S[col][id];this.saveLocal();if(Store.mode==='cloud')Cloud.push({t:col==='learners'?'hs_learners':'hs_records',id,op:'del'});};
 App.status=function(){const e=$('#st');if(!e)return;if(Store.mode!=='cloud'){e.textContent='📱 이 기기에 저장';return;}e.textContent=Cloud.queue.length?`⏳ 저장 대기 ${Cloud.queue.length}`:`☁️ ${Cloud.user?Cloud.user.email:''}`;};
-function viewLogin(el){let email='';try{email=localStorage.getItem('hlab_email')||'';}catch(e){}
- const app=$('#app');app.innerHTML=`<div class="wrap"><div class="login"><div class="mascot">${MASCOT('wow')}</div><h1>우리집 공부방</h1><p class="muted">보호자 이메일로 로그인해요. 아이들 기록이 어느 기기에서나 이어져요.</p>
- <div class="card" id="lb"><div class="field"><label>보호자 이메일</label><input type="email" id="em" value="${esc(email)}" placeholder="example@gmail.com" autocomplete="email" inputmode="email"></div><button class="btn" id="send" style="width:100%">로그인 메일 받기</button><p class="note" id="ln"></p></div>
+function viewLogin(el,tab){let email='';try{email=localStorage.getItem('hlab_email')||'';}catch(e){}tab=tab||'in';
+ const app=$('#app');app.innerHTML=`<div class="wrap"><div class="login"><div class="mascot">${MASCOT('wow')}</div><h1>우리집 공부방</h1><p class="muted">보호자 이메일과 비밀번호로 로그인해요. 아이들 기록이 어느 기기에서나 이어져요.</p>
+ <div class="card" id="lb"><div class="ltabs"><button data-t="in" class="${tab==='in'?'on':''}">로그인</button><button data-t="up" class="${tab==='up'?'on':''}">처음이에요 (가입)</button></div>
+ <div class="field"><label>보호자 이메일</label><input type="email" id="em" value="${esc(email)}" placeholder="example@gmail.com" autocomplete="username" inputmode="email"></div>
+ <div class="field"><label>비밀번호 ${tab==='up'?'<span class="small">(6자 이상)</span>':''}</label><input type="password" id="pw" autocomplete="${tab==='up'?'new-password':'current-password'}" placeholder="••••••"></div>
+ ${tab==='up'?`<div class="field"><label>비밀번호 확인</label><input type="password" id="pw2" autocomplete="new-password" placeholder="••••••"></div>`:''}
+ <button class="btn" id="go" style="width:100%">${tab==='up'?'가입하고 시작하기':'로그인'}</button><p class="note" id="ln"></p>
+ ${tab==='in'?'<p class="small" style="margin:6px 0 0">비밀번호를 잊었거나 예전에 메일 링크로만 로그인했다면, 이미 로그인된 다른 기기의 <b>사용법 → 계정</b>에서 비밀번호를 정할 수 있어요.</p>':''}</div>
  <p class="small">로그인 없이 쓰려면 <a href="#" id="skip">이 기기에만 저장하기</a></p></div></div>`;
- const showCode=()=>{$('#lb').innerHTML=`<div style="text-align:center;font-size:44px">📬</div><p style="margin-top:0;text-align:center"><b>${esc(email)}</b>(으)로 로그인 메일을 보냈어요.<br><b>메일 속 "Sign in" 링크를 이 기기에서 눌러 주세요.</b><br><span class="small">링크를 누르면 이 앱이 열리면서 자동으로 로그인돼요. 메일이 안 보이면 스팸함도 확인해 주세요.</span></p>
-  <details style="margin:10px 0"><summary class="small" style="cursor:pointer">메일에 숫자 코드가 있다면</summary><div class="field"><input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" style="font-family:Jua;font-size:30px;letter-spacing:8px;text-align:center"></div><button class="btn gr sm" id="ver" style="width:100%">코드로 로그인</button></details><p class="note" id="ln"></p><button class="btn ghost sm" id="back">이메일 다시 입력</button>`;
-  
-  $('#back').onclick=()=>viewLogin();
-  $('#ver').onclick=async()=>{const t=$('#code').value.replace(/\D/g,'');if(t.length<6)return toast('코드를 모두 입력해 주세요');$('#ver').disabled=true;try{await Cloud.verify(email,t);try{localStorage.removeItem('hlab_local_only');}catch(_){}await afterLogin();}catch(e){$('#ver').disabled=false;$('#ln').textContent='코드가 맞지 않거나 시간이 지났어요. 다시 확인하거나 코드를 새로 받아 주세요.';}};
-  $('#code').onkeydown=e=>{if(e.key==='Enter')$('#ver').click();};};
- $('#send').onclick=async()=>{email=$('#em').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return toast('이메일 주소를 확인해 주세요');$('#send').disabled=true;$('#ln').textContent='보내는 중…';
-  try{await Cloud.sendCode(email);try{localStorage.setItem('hlab_email',email);}catch(e){}showCode();}
-  catch(e){$('#send').disabled=false;const m=String(e&&e.message||'');$('#ln').textContent=/rate|seconds|limit/i.test(m)?'잠시 후에 다시 시도해 주세요. (메일은 짧은 시간에 여러 번 보낼 수 없어요)':'메일을 보내지 못했어요: '+m;}};
- $('#em').onkeydown=e=>{if(e.key==='Enter')$('#send').click();};
+ app.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{try{localStorage.setItem('hlab_email',$('#em').value.trim());}catch(e){}viewLogin(null,b.dataset.t);});
+ const msg=t=>{$('#ln').textContent=t;};
+ $('#go').onclick=async()=>{email=$('#em').value.trim();const pw=$('#pw').value;if(!/^\S+@\S+\.\S+$/.test(email))return msg('이메일 주소를 확인해 주세요.');if(pw.length<6)return msg('비밀번호는 6자 이상이에요.');
+  if(tab==='up'&&pw!==$('#pw2').value)return msg('비밀번호 두 개가 서로 달라요.');
+  const b=$('#go');b.disabled=true;msg(tab==='up'?'가입하는 중…':'로그인하는 중…');try{localStorage.setItem('hlab_email',email);}catch(e){}
+  try{let r;if(tab==='up'){r=await Cloud.sb.auth.signUp({email,password:pw});if(r.error)throw r.error;
+     if(r.data.user&&r.data.user.identities&&r.data.user.identities.length===0){b.disabled=false;return msg('이미 가입된 이메일이에요. "로그인" 탭에서 로그인해 주세요.');}
+     if(!r.data.session){const r2=await Cloud.sb.auth.signInWithPassword({email,password:pw});if(r2.error){b.disabled=false;return msg('가입은 됐지만 바로 로그인하지 못했어요. 잠시 뒤 "로그인" 탭에서 다시 해 주세요.');}r=r2;}}
+   else{r=await Cloud.sb.auth.signInWithPassword({email,password:pw});if(r.error)throw r.error;}
+   Cloud.user=r.data.user;try{localStorage.removeItem('hlab_local_only');}catch(_){}await afterLogin();}
+  catch(e){b.disabled=false;const m=String(e&&e.message||'');msg(/invalid login/i.test(m)?'이메일이나 비밀번호가 맞지 않아요.':/rate|limit/i.test(m)?'잠시 후에 다시 시도해 주세요.':/registered|exists/i.test(m)?'이미 가입된 이메일이에요. "로그인" 탭에서 로그인해 주세요.':'문제가 생겼어요: '+m);}};
+ ['em','pw','pw2'].forEach(id=>{const x=$('#'+id);if(x)x.onkeydown=e=>{if(e.key==='Enter')$('#go').click();};});
  $('#skip').onclick=e=>{e.preventDefault();try{localStorage.setItem('hlab_local_only','1');}catch(_){}Store.mode='local';App.view='home';App.render();};}
 // 로그인 화면 라우팅
 const _render=App.render.bind(App);App.render=function(){if(this.view==='login')return viewLogin();return _render();};
 // 사용법 화면에 로그아웃 추가
-const _help=viewHelp;viewHelp=function(el){_help(el);if(Store.mode!=='cloud'&&Cloud.sb){const c=document.createElement('div');c.className='card';c.innerHTML=`<h2 style="margin-top:0">👤 계정</h2><p style="margin-top:0">지금은 이 기기에만 저장하고 있어요. 보호자 이메일로 로그인하면 기록이 클라우드에 저장되고 다른 기기에서도 이어져요. 이 기기의 기록도 함께 올라가요.</p><button class="btn sm" id="li">이메일로 로그인</button>`;el.querySelector('.grid').prepend(c);$('#li').onclick=()=>{try{localStorage.removeItem('hlab_local_only');}catch(e){}App.view='login';App.render();};}
- if(Store.mode==='cloud'&&Cloud.user){const c=document.createElement('div');c.className='card';c.innerHTML=`<h2 style="margin-top:0">👤 계정</h2><p style="margin-top:0">${esc(Cloud.user.email)}(으)로 로그인되어 있어요. 기록은 클라우드에 저장돼요.</p><button class="btn ghost sm" id="lo">로그아웃</button>`;el.querySelector('.grid').prepend(c);
+const _help=viewHelp;viewHelp=function(el){_help(el);if(Store.mode!=='cloud'&&Cloud.sb){const c=document.createElement('div');c.className='card';c.innerHTML=`<h2 style="margin-top:0">👤 계정</h2><p style="margin-top:0">지금은 이 기기에만 저장하고 있어요. 보호자 이메일로 로그인하면 기록이 클라우드에 저장되고 다른 기기에서도 이어져요. 이 기기의 기록도 함께 올라가요.</p><button class="btn sm" id="li">로그인 · 가입하기</button>`;el.querySelector('.grid').prepend(c);$('#li').onclick=()=>{try{localStorage.removeItem('hlab_local_only');}catch(e){}App.view='login';App.render();};}
+ if(Store.mode==='cloud'&&Cloud.user){const c=document.createElement('div');c.className='card';c.innerHTML=`<h2 style="margin-top:0">👤 계정</h2><p style="margin-top:0">${esc(Cloud.user.email)}(으)로 로그인되어 있어요. 기록은 클라우드에 저장돼요.</p><div class="row"><button class="btn sm" id="setpw">🔑 비밀번호 정하기·바꾸기</button><button class="btn ghost sm" id="lo">로그아웃</button></div>`;el.querySelector('.grid').prepend(c);
+ $('#setpw').onclick=async()=>{const r=await modal(`<h2>🔑 비밀번호 정하기</h2><p class="small" style="margin-top:0">다른 기기(아이패드 등)에서 이 이메일과 비밀번호로 로그인해요.</p><div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" name="p1" autocomplete="new-password"></div><div class="field"><label>한 번 더</label><input type="password" name="p2" autocomplete="new-password"></div>`,[{t:'취소',v:0,cls:'ghost'},{t:'저장',v:1}]);
+  if(!r.v)return;const p1=r.data.p1||'',p2=r.data.p2||'';if(p1.length<6)return toast('비밀번호는 6자 이상이에요');if(p1!==p2)return toast('두 비밀번호가 달라요');
+  const {error}=await Cloud.sb.auth.updateUser({password:p1});toast(error?('저장하지 못했어요: '+error.message):'비밀번호를 저장했어요. 다른 기기에서 이 비밀번호로 로그인하세요');};
+
  $('#lo').onclick=async()=>{const r=await modal('<h2>로그아웃할까요?</h2><p>이 기기에서 로그아웃해요. 기록은 클라우드에 남아 있어요.</p>',[{t:'취소',v:0,cls:'ghost'},{t:'로그아웃',v:1}]);if(!r.v)return;await Cloud.signOut();Store.S={learners:{},records:{}};Store.saveLocal();Store.mode='local';App.view='login';App.render();};}};
 
 Store.loadLocal();Voice.init();App.render();Store.connect();
